@@ -1,29 +1,54 @@
-# Şehir Sorun Haritası — v0.1 prototip
+# Sokak
 
-Sıfırdan başlatılan civic issue reporting uygulamasının ilk etkileşimli mobil prototipi.
+Mahalle ve sokak ölçeğindeki kamusal sorunları harita üzerinde görünür, doğrulanabilir ve takip edilebilir hale getirmeyi amaçlayan civic-tech uygulaması.
 
-## Bu sürümde
-- Harita merkezli mobil ana ekran
-- Sorun noktaları ve üç seviyeli durum/önem rengi
+## v0.2
+
+İlk statik prototip, üretim koduna geçiş için React + TypeScript + Vite mimarisine taşındı.
+
+### Şu anda çalışanlar
+- MapLibre tabanlı harita
+- Harita üzerinde örnek sorun kayıtları
+- Sorun / yoğunluk görünümü
 - Sorun detay bottom-sheet'i
-- "Ben de gördüm" doğrulaması
-- Sorunlar / Yoğunluk harita görünümü
-- 4 adımlı sorun bildirme akışı
-- Konum izni desteği
-- Yakındaki aynı kategoriyi temel düzeyde algılama uyarısı
-- Yeni bildirimi canlı olarak haritaya ekleme
-- PWA manifest + temel service worker
+- “Ben de gördüm” doğrulaması
+- Dört adımlı sorun bildirme akışı
+- Tarayıcı konum izni
+- 160 metre içinde aynı kategoride olası mükerrer bildirim uyarısı
+- Yeni bildirimin istemci tarafında haritaya eklenmesi
+- Mobil öncelikli responsive arayüz
+- GitHub Pages için otomatik build/deploy workflow'u
 
-## Çalıştırma
-Dosya klasöründe bir yerel HTTP sunucusu açın:
+## Teknoloji
+- React 19.3
+- TypeScript 7
+- Vite 8.3
+- MapLibre GL JS 6.11.2
+
+## Yerelde çalıştırma
 
 ```bash
-python -m http.server 4173
+npm install
+npm run dev
 ```
 
-Ardından `http://localhost:4173` adresini açın.
+Vite base path `/sokak/` olarak ayarlıdır. Yerel geliştirmede terminalde verilen URL'yi kullanın.
 
-> Harita katmanı prototipte OpenStreetMap raster tile'larını kullanır. Production için uygun bir tile sağlayıcısı / kendi tile altyapısı seçilmelidir.
+## Production build
 
-## Sonraki teknik adım
-Bu prototip ürün yönünü doğruladıktan sonra React + TypeScript tabanlı üretim koduna taşınacak; gerçek backend, kullanıcı sistemi, fotoğraf depolama, moderasyon, yetkili paneli ve veri modeli eklenecek.
+```bash
+npm run build
+npm run preview
+```
+
+## Pages
+
+`main` dalına yapılan push, `.github/workflows/pages.yml` üzerinden production build alır ve `dist/` çıktısını GitHub Pages'e gönderir.
+
+## Not
+
+Prototipte harita tabanı doğrudan OpenStreetMap raster tile sunucusunu kullanır. Bu kullanım geliştirme/prototip içindir; gerçek trafik almadan önce production'a uygun tile sağlayıcısı veya kendi harita altyapımız seçilmelidir.
+
+## Sonraki ürün katmanı
+
+v0.3'te gerçek veri katmanı ele alınacak: kullanıcı kimliği, kalıcı sorun kayıtları, fotoğraf depolama, yorum/doğrulama verileri ve moderasyon temeli.
