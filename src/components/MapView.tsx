@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import maplibregl, { AttributionControl, NavigationControl, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
+import { AttributionControl, NavigationControl, type GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
 import type { Issue, MapMode, Point } from '../types';
 
 interface MapViewProps {
@@ -94,7 +95,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
         },
       });
 
-      map.on('click', 'issue-points', (event) => {
+      map.on('click', 'issue-points', (event: any) => {
         const id = event.features?.[0]?.properties?.id as string | undefined;
         if (id) selectRef.current(id);
       });
