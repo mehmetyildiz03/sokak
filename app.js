@@ -74,7 +74,7 @@ map.on('load', () => {
     paint: {
       'heatmap-weight': ['interpolate', ['linear'], ['get', 'severity'], 1, 0.35, 3, 1],
       'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 16, 2],
-      'heatmap-radius': ['interpolate', ['linear], ['zoom'], 10, 22, 16, 50],
+      'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 22, 16, 50],
       'heatmap-opacity': 0.72,
       'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'], 0, 'rgba(40,107,118,0)', 0.25, '#7fd0c3', 0.5, '#ffd266', 0.75, '#f38b48', 1, '#d9473f']
     }
@@ -97,7 +97,7 @@ map.on('load', () => {
     type: 'circle',
     source: 'issues',
     paint: {
-      'circle-radius': ['interpolate', ['linear], ['zoom'], 11, 6, 16, 9],
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 6, 16, 9],
       'circle-color': ['match', ['get', 'severity'], 1, '#7d8898', 2, '#f0a728', 3, '#de5a45', '#7d8898'],
       'circle-stroke-width': 3,
       'circle-stroke-color': '#ffffff'
@@ -125,7 +125,7 @@ function makeGeoJson() {
 }
 
 function refreshIssues() {
-  const source = map.getSource("issues");
+  const source = map.getSource('issues');
   if (source) source.setData(makeGeoJson());
 }
 
@@ -163,18 +163,18 @@ $('#confirmIssueButton').addEventListener('click', () => {
   if (!issue) return;
   issue.confirms += 1;
   $('#issueConfirms').textContent = issue.confirms;
-  showToast('Doğrulaman kaydedildi. Teş ekkürler.');
+  showToast('Doğrulaman kaydedildi. Teşekkürler.');
 });
 
 $$('.mode-btn').forEach(button => {
   button.addEventListener('click', () => {
     mapMode = button.dataset.mode;
     $$('.mode-btn').forEach(item => item.classList.toggle('active', item === button));
-    if (!map.getLayer("issue-heat")) return;
+    if (!map.getLayer('issue-heat')) return;
     const heat = mapMode === 'heat';
     map.setLayoutProperty('issue-heat', 'visibility', heat ? 'visible' : 'none');
-    map.setLayoutProperty("issue-halo", 'visibility', heat ? 'none' : 'visible');
-    map.setLayoutProperty("issue-points", 'visibility', heat ? 'none' : 'visible');
+    map.setLayoutProperty('issue-halo', 'visibility', heat ? 'none' : 'visible');
+    map.setLayoutProperty('issue-points', 'visibility', heat ? 'none' : 'visible');
     $('#mapLegend').style.display = heat ? 'none' : '';
   });
 });
@@ -311,7 +311,7 @@ function submitReport() {
     category: reportDraft.category,
     categoryLabel: reportDraft.categoryLabel,
     emoji: reportDraft.emoji,
-    title: reportDraft.description.length > 44 ? `${reportDraft.description.slice(0, 44)}‧` : reportDraft.description,
+    title: reportDraft.description.length > 44 ? `${reportDraft.description.slice(0, 44)}…` : reportDraft.description,
     place: 'Yeni bildirilen konum',
     description: reportDraft.description,
     confirms: 1,
