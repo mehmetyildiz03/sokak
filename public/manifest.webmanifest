@@ -1,0 +1,11 @@
+{
+  "name": "Sokak — Şehir Sorun Haritası",
+  "short_name": "Sokak",
+  "start_url": "/sokak/",
+  "scope": "/sokak/",
+  "display": "standalone",
+  "background_color": "#f7f9fc",
+  "theme_color": "#145c68",
+  "lang": "tr",
+  "description": "Mahalle ve sokak sorunlarını görün, doğrulayın ve bildirin."
+}
