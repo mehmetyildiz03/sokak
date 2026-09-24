@@ -1,0 +1,158 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { Issue, IssueCategory, Point, ReportDraft } from '../types';
+import { distanceMeters } from '../utils';
+
+interface ReportFlowProps {
+  open: boolean;
+  center: Point;
+  issues: Issue[];
+  onClose: () => void;
+  onSubmit: (draft: ReportDraft) => void;
+  requestLocation: () => Promise<Point>;
+  notify: (message: string) => void;
+}
+
+const categories: Array<{ key: IssueCategory; label: string; emoji: string }> = [
+  { key: 'road', label: 'Yol / Asfalt', emoji: '🕳️' },
+  { key: 'light', label: 'Aydınlatma', emoji: '💡' },
+  { key: 'trash', label: 'Çöp / Temizlik', emoji: '🗑️' },
+  { key: 'sidewalk', label: 'Kaldırım', emoji: '🚧' },
+  { key: 'water', label: 'Su / Kanalizasyon', emoji: '💧' },
+  { key: 'park', label: 'Park / Yeşil alan', emoji: '🌳' },
+];
+
+const stepTitles = ['Sorun nerede?', 'Ne tür bir sorun?', 'Ne oluyor?', 'Kontrol et ve gönder'];
+
+function emptyDraft(center: Point): ReportDraft {
+  return { ...center, category: null, categoryLabel: '', emoji: '📍', description: '', photoUrl: '' };
+}
+
+export function ReportFlow({ open, center, issues, onClose, onSubmit, requestLocation, notify }: ReportFlowProps) {
+  const [step, setStep] = useState(1);
+  const [draft, setDraft] = useState<ReportDraft>(() => emptyDraft(center));
+
+  useEffect(() => {
+    if (!open) return;
+    setStep(1);
+    setDraft(emptyDraft(center));
+  }, [open, center.lng, center.lat]);
+
+  const similar = useMemo(() => {
+    if (!draft.category) return false;
+    return issues.some((issue) => issue.category === draft.category && distanceMeters(issue.lat, issue.lng, draft.lat, draft.lng) < 160);
+  }, [draft, issues]);
+
+  if (!open) return null;
+
+  const selectCategory = (key: IssueCategory, label: string, emoji: string) => {
+    setDraft((current) => ({ ...current, category: key, categoryLabel: label, emoji }));
+  };
+
+  const next = () => {
+    if (step === 2 && !draft.category) {
+      notify('Önce bir sorun kategorisi seç.');
+      return;
+    }
+    if (step === 3 && draft.description.trim().length < 8) {
+      notify('Sorunu birkaç kelimeyle daha net anlat.');
+      return;
+    }
+    if (step < 4) setStep((value) => value + 1);
+    else onSubmit({ ...draft, description: draft.description.trim() });
+  };
+
+  const useLocation = async () => {
+    try {
+      const point = await requestLocation();
+      setDraft((current) => ({ ...current, ...point }));
+      notify('Konum seçildi.');
+    } catch {
+      notify('Konum alınamadı; harita merkezi kullanılacak.');
+    }
+  };
+
+  const addPhoto = (file?: File) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setDraft((current) => ({ ...current, photoUrl: url }));
+  };
+
+  return (
+    <div className="modal-backdrop open" aria-hidden="false" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
+      <section className="report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+        <header className="modal-header">
+          <button className="icon-btn plain" onClick={onClose} aria-label="Kapat">×</button>
+          <div><span className="eyebrow">{step} / 4</span><h2 id="reportTitle">{stepTitles[step - 1]}</h2></div>
+          <span className="header-spacer" />
+        </header>
+        <div className="step-progress"><i style={{ width: `${step * 25}%` }} /></div>
+        <div className="report-content">
+          {step === 1 && (
+            <section className="report-step active">
+              <div className="location-card">
+                <div className="location-icon">⌖</div>
+                <div><strong>Seçili konum</strong><p>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</p></div>
+              </div>
+              <button className="secondary-btn" onClick={useLocation}>Konumumu kullan</button>
+              <p className="helper">Konum izni vermezsen haritanın merkezindeki noktayı kullanırız. Pin sürükleme sonraki konum düzenleme adımına eklenecek.</p>
+            </section>
+          )}
+          {step === 2 && (
+            <section className="report-step active">
+              <div className="category-grid">
+                {categories.map((category) => (
+                  <button
+                    key={category.key}
+                    className={`category-option ${draft.category === category.key ? 'selected' : ''}`}
+                    onClick={() => selectCategory(category.key, category.label, category.emoji)}
+                    aria-pressed={draft.category === category.key}
+                  >
+                    <span>{category.emoji}</span>{category.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          {step === 3 && (
+            <section className="report-step active">
+              <label className="field-label" htmlFor="reportDescription">Sorunu kısaca anlat</label>
+              <textarea
+                id="reportDescription"
+                maxLength={240}
+                value={draft.description}
+                onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
+                placeholder="Örn. Çukur nedeniyle araçlar karşı şeride geçiyor."
+              />
+              <div className="field-meta"><span>Net ve gözleme dayalı yaz.</span><span>{draft.description.length} / 240</span></div>
+              <label className="photo-upload">
+                <span className="upload-icon">＋</span>
+                <span><strong>Fotoğraf ekle</strong><small>İlk sürümde isteğe bağlı</small></span>
+                <input type="file" accept="image/*" hidden onChange={(event) => addPhoto(event.target.files?.[0])} />
+              </label>
+              {draft.photoUrl && <div className="photo-preview" style={{ backgroundImage: `url(${draft.photoUrl})` }} />}
+            </section>
+          )}
+          {step === 4 && (
+            <section className="report-step active">
+              <div className="review-card">
+                <div className="review-emoji">{draft.emoji}</div>
+                <div><span className="eyebrow">Yeni bildirim</span><h3>{draft.categoryLabel || 'Kategori seçilmedi'}</h3><p>{draft.description || 'Açıklama eklenmedi.'}</p></div>
+              </div>
+              {similar && (
+                <div className="similar-warning">
+                  <strong>Yakında benzer bir bildirim olabilir.</strong>
+                  <p>Aynı sorunu tekrar açmak yerine mevcut kaydı doğrulamak daha faydalı olabilir.</p>
+                </div>
+              )}
+              <p className="helper">Gönderdiğinde kayıt haritada “Yeni” durumuyla görünür. Yetkili işlem yapana kadar topluluk tarafından doğrulanabilir.</p>
+            </section>
+          )}
+        </div>
+        <footer className="modal-footer">
+          <button className="secondary-btn compact" disabled={step === 1} onClick={() => setStep((value) => Math.max(1, value - 1))}>Geri</button>
+          <button className="primary-btn compact" onClick={next}>{step === 4 ? 'Bildirimi gönder' : 'Devam'}</button>
+        </footer>
+      </section>
+    </div>
+  );
+}
