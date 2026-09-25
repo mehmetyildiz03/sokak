@@ -67,6 +67,38 @@ Header:
 { "issueIds": ["iss-1", "iss-2"] }
 ```
 
+### GET /v1/me/follows
+
+Header:
+
+`X-Sokak-Client-Id: <anonymous browser id>`
+
+200:
+
+```json
+{ "issueIds": ["iss-1", "iss-5"] }
+```
+
+### PUT /v1/issues/:id/follow
+
+Sorunu takip eder. İşlem idempotent olmalıdır.
+
+200:
+
+```json
+{ "followed": true }
+```
+
+### DELETE /v1/issues/:id/follow
+
+Sorunun takibini bırakır. Kayıt zaten yoksa yine başarılı kabul edilmelidir.
+
+200:
+
+```json
+{ "followed": false }
+```
+
 ### POST /v1/issues/:id/confirmations
 
 Header:
