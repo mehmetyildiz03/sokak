@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapView } from './components/MapView';
 import { IssueSheet } from './components/IssueSheet';
+import { NearbyPanel } from './components/NearbyPanel';
 import { ReportFlow } from './components/ReportFlow';
 import { createIssueRepository } from './data/createIssueRepository';
 import { initialIssues } from './data/issues';
@@ -20,7 +21,11 @@ export default function App() {
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [confirmedIssueIds, setConfirmedIssueIds] = useState<string[]>([]);
   const [mode, setMode] = useState<MapMode>('issues');
+  const [activeView, setActiveView] = useState<'map' | 'nearby'>('map');
   const [center, setCenter] = useState<Point>(initialCenter);
+  const [nearbyOrigin, setNearbyOrigin] = useState<Point>(initialCenter);
+  const [nearbyLocationSource, setNearbyLocationSource] = useState<'device' | 'map'>('map');
+  const [nearbyLocating, setNearbyLocating] = useState(false);
   const [focus, setFocus] = useState<(Point & { key: number }) | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [dataReady, setDataReady] = useState(false);
@@ -90,6 +95,31 @@ export default function App() {
     }
   };
 
+  const useDeviceLocationForNearby = async () => {
+    if (nearbyLocating) return;
+    setNearbyLocating(true);
+    try {
+      const point = await requestLocation();
+      setNearbyOrigin(point);
+      setNearbyLocationSource('device');
+      notify('Yakındaki sorunlar konumuna göre sıralandı.');
+    } catch {
+      setNearbyLocationSource('map');
+      notify('Konum alınamadı; harita merkezi referans olarak kullanılıyor.');
+    } finally {
+      setNearbyLocating(false);
+    }
+  };
+
+  const openNearby = () => {
+    setSelectedIssueId(null);
+    setReportOpen(false);
+    setNearbyOrigin(center);
+    setNearbyLocationSource('map');
+    setActiveView('nearby');
+    void useDeviceLocationForNearby();
+  };
+
   const confirmIssue = async (id: string) => {
     if (confirmedIssueIds.includes(id)) {
       notify('Bu sorunu zaten doğruladın.');
@@ -134,6 +164,7 @@ export default function App() {
     const issue = issues.find((item) => item.id === id);
     if (!issue) return;
     setReportOpen(false);
+    setActiveView('map');
     setSelectedIssueId(id);
     setMode('issues');
     setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
@@ -206,7 +237,18 @@ export default function App() {
           </div>
         )}
 
-        <header className="topbar glass">
+        {activeView === 'nearby' && (
+          <NearbyPanel
+            issues={issues}
+            origin={nearbyOrigin}
+            locationSource={nearbyLocationSource}
+            locating={nearbyLocating}
+            onUseDeviceLocation={() => void useDeviceLocationForNearby()}
+            onSelectIssue={openExistingIssue}
+          />
+        )}
+
+        <header className={`topbar glass ${activeView === 'nearby' ? 'under-panel' : ''}`}>
           <button className="icon-btn" onClick={locateFromHeader} aria-label="Konumumu bul">⌖</button>
           <button
             className="location-pill"
@@ -225,7 +267,7 @@ export default function App() {
           </button>
         </header>
 
-        <div className="mode-switch glass" role="group" aria-label="Harita görünümü">
+        {activeView === 'map' && <div className="mode-switch glass" role="group" aria-label="Harita görünümü">
           <button
             className={`mode-btn ${mode === 'issues' ? 'active' : ''}`}
             onClick={() => setMode('issues')}
@@ -240,9 +282,9 @@ export default function App() {
           >
             Yoğunluk
           </button>
-        </div>
+        </div>}
 
-        {mode === 'issues' ? (
+        {activeView === 'map' && (mode === 'issues' ? (
           <aside className="map-legend glass" aria-label="Sorun durumları">
             <span><i className="dot dot-new" /> Yeni</span>
             <span><i className="dot dot-confirmed" /> Doğrulandı</span>
@@ -252,9 +294,9 @@ export default function App() {
           <aside className="heat-legend glass" aria-label="Sorun yoğunluğu">
             <span>Az</span><i aria-hidden="true" /><span>Yoğun</span>
           </aside>
-        )}
+        ))}
 
-        <button
+        {activeView === 'map' && <button
           className="report-fab"
           disabled={!dataReady}
           onClick={() => {
@@ -264,7 +306,7 @@ export default function App() {
         >
           <span className="plus">＋</span>
           <span>Sorun bildir</span>
-        </button>
+        </button>}
 
         <IssueSheet
           issue={selectedIssue}
@@ -274,12 +316,18 @@ export default function App() {
         />
 
         <nav className="bottom-nav glass" aria-label="Ana menü">
-          <button className="nav-item active" onClick={() => setMode('issues')}>
+          <button
+            className={`nav-item ${activeView === 'map' ? 'active' : ''}`}
+            onClick={() => {
+              setActiveView('map');
+              setMode('issues');
+            }}
+          >
             <span>⌘</span><small>Harita</small>
           </button>
           <button
-            className="nav-item"
-            onClick={() => notify('Yakınımda listesi sonraki ürün adımında açılacak.')}
+            className={`nav-item ${activeView === 'nearby' ? 'active' : ''}`}
+            onClick={openNearby}
           >
             <span>◎</span><small>Yakınımda</small>
           </button>
