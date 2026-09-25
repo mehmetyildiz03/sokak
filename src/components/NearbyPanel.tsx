@@ -11,6 +11,14 @@ interface NearbyPanelProps {
   onSelectIssue: (id: string) => void;
 }
 
+function statusTone(status: Issue['status']): string {
+  if (status === 'Çözüldü') return 'resolved';
+  if (status === 'İşlemde') return 'working';
+  if (status === 'Uzun süredir açık') return 'old';
+  if (status === 'Doğrulandı') return 'confirmed';
+  return 'new';
+}
+
 export function NearbyPanel({
   issues,
   origin,
@@ -112,7 +120,7 @@ export function NearbyPanel({
               <strong className="nearby-title">{issue.title}</strong>
               <span className="nearby-place">{issue.place}</span>
               <span className="nearby-meta">
-                <span className={`nearby-status status-${issue.status.toLowerCase().replaceAll(' ', '-')}`}>
+                <span className={`nearby-status ${statusTone(issue.status)}`}>
                   {issue.status}
                 </span>
                 <span>👥 {issue.confirms}</span>
