@@ -8,6 +8,7 @@ interface ReportFlowProps {
   issues: Issue[];
   onClose: () => void;
   onSubmit: (draft: ReportDraft) => void;
+  onOpenIssue: (id: string) => void;
   requestLocation: () => Promise<Point>;
   notify: (message: string) => void;
 }
@@ -27,7 +28,7 @@ function emptyDraft(center: Point): ReportDraft {
   return { ...center, category: null, categoryLabel: '', emoji: '📍', description: '', photoUrl: '' };
 }
 
-export function ReportFlow({ open, center, issues, onClose, onSubmit, requestLocation, notify }: ReportFlowProps) {
+export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssue, requestLocation, notify }: ReportFlowProps) {
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<ReportDraft>(() => emptyDraft(center));
 
@@ -35,11 +36,26 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, requestLoc
     if (!open) return;
     setStep(1);
     setDraft(emptyDraft(center));
-  }, [open, center.lng, center.lat]);
+  }, [open]);
 
-  const similar = useMemo(() => {
-    if (!draft.category) return false;
-    return issues.some((issue) => issue.category === draft.category && distanceMeters(issue.lat, issue.lng, draft.lat, draft.lng) < 160);
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [open, onClose]);
+
+  const similarIssue = useMemo(() => {
+    if (!draft.category) return null;
+    return issues
+      .map((issue) => ({
+        issue,
+        distance: distanceMeters(issue.lat, issue.lng, draft.lat, draft.lng),
+      }))
+      .filter(({ issue, distance }) => issue.category === draft.category && distance < 160)
+      .sort((a, b) => a.distance - b.distance)[0] ?? null;
   }, [draft, issues]);
 
   if (!open) return null;
@@ -73,8 +89,13 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, requestLoc
 
   const addPhoto = (file?: File) => {
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setDraft((current) => ({ ...current, photoUrl: url }));
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      setDraft((current) => ({ ...current, photoUrl: reader.result as string }));
+    };
+    reader.onerror = () => notify('Fotoğraf okunamadı. Başka bir görsel deneyebilirsin.');
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -138,10 +159,17 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, requestLoc
                 <div className="review-emoji">{draft.emoji}</div>
                 <div><span className="eyebrow">Yeni bildirim</span><h3>{draft.categoryLabel || 'Kategori seçilmedi'}</h3><p>{draft.description || 'Açıklama eklenmedi.'}</p></div>
               </div>
-              {similar && (
+              {similarIssue && (
                 <div className="similar-warning">
-                  <strong>Yakında benzer bir bildirim olabilir.</strong>
-                  <p>Aynı sorunu tekrar açmak yerine mevcut kaydı doğrulamak daha faydalı olabilir.</p>
+                  <strong>Yakında benzer bir bildirim var.</strong>
+                  <p>{similarIssue.issue.title} · yaklaşık {Math.max(1, Math.round(similarIssue.distance))} m uzakta</p>
+                  <button
+                    type="button"
+                    className="similar-action"
+                    onClick={() => onOpenIssue(similarIssue.issue.id)}
+                  >
+                    Bu sorunu aç ve doğrula
+                  </button>
                 </div>
               )}
               <p className="helper">Gönderdiğinde kayıt haritada “Yeni” durumuyla görünür. Yetkili işlem yapana kadar topluluk tarafından doğrulanabilir.</p>
