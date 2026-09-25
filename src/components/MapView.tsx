@@ -18,7 +18,11 @@ function makeGeoJson(issues: Issue[]) {
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [issue.lng, issue.lat] },
       properties: {
-        ...issue,
+        id: issue.id,
+        status: issue.status,
+        severity: issue.severity,
+        confirms: issue.confirms,
+        category: issue.category,
         heatWeight: Math.min(
           1,
           (issue.severity / 3) * 0.55 +
