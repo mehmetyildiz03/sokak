@@ -14,6 +14,7 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 - Sorun detay bottom-sheet'i
 - İdempotent “Ben de gördüm” doğrulaması
 - Dört adımlı sorun bildirme akışı
+- Sorun konumunu mini haritada sürüklenebilir pinle veya haritaya dokunarak hassas seçme
 - Tarayıcı konum izni
 - Yakındaki aynı kategoride açık sorun için mükerrer bildirim uyarısı
 - Fotoğraflı yeni bildirim
