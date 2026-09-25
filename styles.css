@@ -428,3 +428,185 @@ button:disabled { cursor: default; }
     display: none;
   }
 }
+
+.issue-actions {
+  display: grid;
+  grid-template-columns: .9fr 1.1fr;
+  gap: 10px;
+  margin-top: 17px;
+}
+.issue-actions .primary-btn,
+.issue-actions .secondary-btn { margin-top: 0; }
+.follow-btn.active {
+  border-color: rgba(20,92,104,.24);
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.follow-panel {
+  position: absolute;
+  z-index: 7;
+  inset: 0 0 calc(env(safe-area-inset-bottom) + 78px) 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  padding: calc(env(safe-area-inset-top) + 18px) 14px 14px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(20,92,104,.09), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #f3f6f8 100%);
+}
+
+.follow-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.follow-header h1 {
+  margin: 2px 0 0;
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+.follow-summary {
+  min-width: 68px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 5px 16px rgba(28,43,69,.07);
+}
+.follow-summary strong { color: var(--brand); font-size: 18px; line-height: 1; }
+.follow-summary span { margin-top: 3px; color: var(--muted); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+
+.follow-stats {
+  display: flex;
+  gap: 14px;
+  padding: 0 2px 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+.follow-stats span { display: inline-flex; align-items: center; gap: 6px; }
+.follow-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--confirmed); }
+.follow-dot.resolved { background: var(--resolved); }
+
+.follow-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 1px 16px;
+  scrollbar-width: thin;
+}
+.follow-card {
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: white;
+  box-shadow: 0 8px 24px rgba(28,43,69,.07);
+}
+.follow-card-main {
+  width: 100%;
+  min-height: 108px;
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 18px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 0;
+  background: white;
+  color: var(--ink);
+  text-align: left;
+}
+.follow-thumb {
+  width: 68px;
+  height: 82px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg,#e7eef1,#cedade);
+  background-size: cover;
+  background-position: center;
+  font-size: 30px;
+  overflow: hidden;
+}
+.follow-copy { min-width: 0; display: flex; flex-direction: column; }
+.follow-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.follow-category {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.follow-title {
+  margin-top: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.follow-place {
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+}
+.follow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 9px;
+  margin-top: 9px;
+  color: #6e7a8a;
+  font-size: 10px;
+}
+.follow-chevron { color: #a7b0bb; font-size: 25px; text-align: center; }
+.follow-remove {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-top: 1px solid #edf0f4;
+  background: #fbfcfd;
+  color: #8b5a5a;
+  font-size: 11px;
+  font-weight: 850;
+}
+.follow-empty {
+  margin-top: 52px;
+  padding: 30px 22px;
+  border: 1px dashed #cdd6df;
+  border-radius: 20px;
+  background: rgba(255,255,255,.72);
+  text-align: center;
+}
+.follow-empty > span {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 11px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 24px;
+}
+.follow-empty strong { display: block; font-size: 14px; }
+.follow-empty p { margin: 6px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+
+@media (max-width: 380px) {
+  .issue-actions { grid-template-columns: 1fr; }
+  .follow-card-main { grid-template-columns: 58px minmax(0,1fr) 16px; }
+  .follow-thumb { width: 58px; height: 74px; }
+}
