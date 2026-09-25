@@ -24,8 +24,10 @@ export default function App() {
   const [activeView, setActiveView] = useState<'map' | 'nearby'>('map');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [nearbyOrigin, setNearbyOrigin] = useState<Point>(initialCenter);
+  const [nearbyDeviceOrigin, setNearbyDeviceOrigin] = useState<Point | null>(null);
   const [nearbyLocationSource, setNearbyLocationSource] = useState<'device' | 'map'>('map');
   const [nearbyLocating, setNearbyLocating] = useState(false);
+  const [nearbyAutoLocationTried, setNearbyAutoLocationTried] = useState(false);
   const [focus, setFocus] = useState<(Point & { key: number }) | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [dataReady, setDataReady] = useState(false);
@@ -100,6 +102,7 @@ export default function App() {
     setNearbyLocating(true);
     try {
       const point = await requestLocation();
+      setNearbyDeviceOrigin(point);
       setNearbyOrigin(point);
       setNearbyLocationSource('device');
       notify('Yakındaki sorunlar konumuna göre sıralandı.');
@@ -114,10 +117,21 @@ export default function App() {
   const openNearby = () => {
     setSelectedIssueId(null);
     setReportOpen(false);
+    setActiveView('nearby');
+
+    if (nearbyDeviceOrigin) {
+      setNearbyOrigin(nearbyDeviceOrigin);
+      setNearbyLocationSource('device');
+      return;
+    }
+
     setNearbyOrigin(center);
     setNearbyLocationSource('map');
-    setActiveView('nearby');
-    void useDeviceLocationForNearby();
+
+    if (!nearbyAutoLocationTried) {
+      setNearbyAutoLocationTried(true);
+      void useDeviceLocationForNearby();
+    }
   };
 
   const confirmIssue = async (id: string) => {
