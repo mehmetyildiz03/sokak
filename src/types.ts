@@ -20,6 +20,7 @@ export interface Issue extends Point {
   age: string;
   severity: 1 | 2 | 3;
   status: IssueStatus;
+  photoUrl?: string;
 }
 
 export interface ReportDraft extends Point {
