@@ -723,3 +723,15 @@ button:disabled { cursor: default; }
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
+.geocoding-note {
+  margin: 9px 2px 0;
+  color: #7a8494;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.geocoding-note a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
