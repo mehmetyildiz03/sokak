@@ -10,6 +10,7 @@ const initialCenter: Point = { lng: 30.5566, lat: 37.7648 };
 export default function App() {
   const [issues, setIssues] = useState<Issue[]>(initialIssues);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [confirmedIssueIds, setConfirmedIssueIds] = useState<string[]>([]);
   const [mode, setMode] = useState<MapMode>('issues');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [focus, setFocus] = useState<(Point & { key: number }) | null>(null);
@@ -56,10 +57,24 @@ export default function App() {
   };
 
   const confirmIssue = (id: string) => {
+    if (confirmedIssueIds.includes(id)) {
+      notify('Bu sorunu zaten doğruladın.');
+      return;
+    }
     setIssues((current) => current.map((issue) =>
       issue.id === id ? { ...issue, confirms: issue.confirms + 1 } : issue,
     ));
+    setConfirmedIssueIds((current) => [...current, id]);
     notify('Doğrulaman kaydedildi. Teşekkürler.');
+  };
+
+  const openExistingIssue = (id: string) => {
+    const issue = issues.find((item) => item.id === id);
+    if (!issue) return;
+    setReportOpen(false);
+    setSelectedIssueId(id);
+    setMode('issues');
+    setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
   };
 
   const submitReport = (draft: ReportDraft) => {
@@ -80,6 +95,7 @@ export default function App() {
       age: 'şimdi',
       severity: 1,
       status: 'Yeni',
+      photoUrl: draft.photoUrl || undefined,
     };
 
     setIssues((current) => [issue, ...current]);
@@ -157,6 +173,7 @@ export default function App() {
 
         <IssueSheet
           issue={selectedIssue}
+          confirmed={selectedIssue ? confirmedIssueIds.includes(selectedIssue.id) : false}
           onClose={() => setSelectedIssueId(null)}
           onConfirm={confirmIssue}
         />
@@ -193,6 +210,7 @@ export default function App() {
         issues={issues}
         onClose={() => setReportOpen(false)}
         onSubmit={submitReport}
+        onOpenIssue={openExistingIssue}
         requestLocation={requestLocation}
         notify={notify}
       />
