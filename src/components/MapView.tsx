@@ -11,6 +11,14 @@ interface MapViewProps {
   onCenterChange: (point: Point) => void;
 }
 
+function applyMapMode(map: MapLibreMap, mode: MapMode) {
+  if (!map.getLayer('issue-heat')) return;
+  const heat = mode === 'heat';
+  map.setLayoutProperty('issue-heat', 'visibility', heat ? 'visible' : 'none');
+  map.setLayoutProperty('issue-halo', 'visibility', heat ? 'none' : 'visible');
+  map.setLayoutProperty('issue-points', 'visibility', heat ? 'none' : 'visible');
+}
+
 function makeGeoJson(issues: Issue[]) {
   return {
     type: 'FeatureCollection' as const,
@@ -39,9 +47,13 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
   const mapRef = useRef<MapLibreMap | null>(null);
   const selectRef = useRef(onSelectIssue);
   const centerRef = useRef(onCenterChange);
+  const issuesRef = useRef(issues);
+  const modeRef = useRef(mode);
 
   useEffect(() => { selectRef.current = onSelectIssue; }, [onSelectIssue]);
   useEffect(() => { centerRef.current = onCenterChange; }, [onCenterChange]);
+  useEffect(() => { issuesRef.current = issues; }, [issues]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -58,7 +70,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '© OpenStreetMap katkıda bulunanlar',
+            attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap katkıda bulunanlar</a>',
           },
         },
         layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
@@ -69,7 +81,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
 
     map.on('load', () => {
-      map.addSource('issues', { type: 'geojson', data: makeGeoJson(issues) });
+      map.addSource('issues', { type: 'geojson', data: makeGeoJson(issuesRef.current) });
       map.addLayer({
         id: 'issue-heat',
         type: 'heatmap',
@@ -107,6 +119,8 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
         },
       });
 
+      applyMapMode(map, modeRef.current);
+
       map.on('click', 'issue-points', (event: any) => {
         const id = event.features?.[0]?.properties?.id as string | undefined;
         if (id) selectRef.current(id);
@@ -128,6 +142,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
   }, []);
 
   useEffect(() => {
+    issuesRef.current = issues;
     const map = mapRef.current;
     if (!map) return;
     const source = map.getSource('issues') as GeoJSONSource | undefined;
@@ -135,12 +150,10 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
   }, [issues]);
 
   useEffect(() => {
+    modeRef.current = mode;
     const map = mapRef.current;
-    if (!map || !map.getLayer('issue-heat')) return;
-    const heat = mode === 'heat';
-    map.setLayoutProperty('issue-heat', 'visibility', heat ? 'visible' : 'none');
-    map.setLayoutProperty('issue-halo', 'visibility', heat ? 'none' : 'visible');
-    map.setLayoutProperty('issue-points', 'visibility', heat ? 'none' : 'visible');
+    if (!map) return;
+    applyMapMode(map, mode);
   }, [mode]);
 
   useEffect(() => {
