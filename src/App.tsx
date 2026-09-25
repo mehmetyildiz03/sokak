@@ -61,9 +61,15 @@ export default function App() {
       notify('Bu sorunu zaten doğruladın.');
       return;
     }
-    setIssues((current) => current.map((issue) =>
-      issue.id === id ? { ...issue, confirms: issue.confirms + 1 } : issue,
-    ));
+    setIssues((current) => current.map((issue) => {
+      if (issue.id !== id) return issue;
+      const confirms = issue.confirms + 1;
+      return {
+        ...issue,
+        confirms,
+        status: issue.status === 'Yeni' && confirms >= 2 ? 'Doğrulandı' : issue.status,
+      };
+    }));
     setConfirmedIssueIds((current) => [...current, id]);
     notify('Doğrulaman kaydedildi. Teşekkürler.');
   };
