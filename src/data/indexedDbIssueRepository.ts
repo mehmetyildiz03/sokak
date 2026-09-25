@@ -4,13 +4,21 @@ import { IssueRepositoryError, type ConfirmationResult, type IssueRepository } f
 import type { Issue } from '../types';
 
 const DB_NAME = 'sokak';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const ISSUE_STORE = 'issues';
 const CONFIRMATION_STORE = 'confirmations';
+const FOLLOW_STORE = 'follows';
 const META_STORE = 'meta';
 const SEED_KEY = 'seed:v1';
 
 interface StoredConfirmation {
+  key: string;
+  issueId: string;
+  clientId: string;
+  createdAt: string;
+}
+
+interface StoredFollow {
   key: string;
   issueId: string;
   clientId: string;
@@ -50,6 +58,12 @@ function openDatabase(dbName: string): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(CONFIRMATION_STORE)) {
         const store = db.createObjectStore(CONFIRMATION_STORE, { keyPath: 'key' });
+        store.createIndex('by-client', 'clientId', { unique: false });
+        store.createIndex('by-issue', 'issueId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains(FOLLOW_STORE)) {
+        const store = db.createObjectStore(FOLLOW_STORE, { keyPath: 'key' });
         store.createIndex('by-client', 'clientId', { unique: false });
         store.createIndex('by-issue', 'issueId', { unique: false });
       }
@@ -127,6 +141,17 @@ export class IndexedDbIssueRepository implements IssueRepository {
     return confirmations.map((confirmation) => confirmation.issueId);
   }
 
+  async getFollowedIssueIds(): Promise<string[]> {
+    await this.ensureSeeded();
+    const db = await this.dbPromise;
+    const tx = db.transaction(FOLLOW_STORE, 'readonly');
+    const done = transactionDone(tx);
+    const index = tx.objectStore(FOLLOW_STORE).index('by-client');
+    const follows = await requestToPromise(index.getAll(this.clientId) as IDBRequest<StoredFollow[]>);
+    await done;
+    return follows.map((follow) => follow.issueId);
+  }
+
   async createIssue(issue: Issue): Promise<Issue> {
     await this.ensureSeeded();
     const db = await this.dbPromise;
@@ -197,5 +222,37 @@ export class IndexedDbIssueRepository implements IssueRepository {
 
     await done;
     return { issue: normalizeIssue(updated), alreadyConfirmed: false };
+  }
+
+  async setIssueFollowed(issueId: string, followed: boolean): Promise<void> {
+    await this.ensureSeeded();
+    const db = await this.dbPromise;
+
+    const issueTx = db.transaction(ISSUE_STORE, 'readonly');
+    const issueDone = transactionDone(issueTx);
+    const issue = await requestToPromise(issueTx.objectStore(ISSUE_STORE).get(issueId) as IDBRequest<Issue | undefined>);
+    await issueDone;
+
+    if (!issue) {
+      throw new IssueRepositoryError('Sorun kaydı bulunamadı.');
+    }
+
+    const tx = db.transaction(FOLLOW_STORE, 'readwrite');
+    const done = transactionDone(tx);
+    const store = tx.objectStore(FOLLOW_STORE);
+    const key = `${this.clientId}:${issueId}`;
+
+    if (followed) {
+      store.put({
+        key,
+        issueId,
+        clientId: this.clientId,
+        createdAt: new Date().toISOString(),
+      } satisfies StoredFollow);
+    } else {
+      store.delete(key);
+    }
+
+    await done;
   }
 }
