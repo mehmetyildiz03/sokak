@@ -15,6 +15,7 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 - İdempotent “Ben de gördüm” doğrulaması
 - Dört adımlı sorun bildirme akışı
 - Sorun konumunu mini haritada sürüklenebilir pinle veya haritaya dokunarak hassas seçme
+- Seçilen koordinatı ters geocoding ile mahalle/sokak etiketine çevirme; sonuç yerel cache ile tekrar kullanılabilir
 - Tarayıcı konum izni
 - Yakındaki aynı kategoride açık sorun için mükerrer bildirim uyarısı
 - Fotoğraflı yeni bildirim
@@ -24,6 +25,7 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 - Backend bağımsız `IssueRepository` sözleşmesi
 - Hazır REST adapter'ı: `VITE_API_BASE_URL` verildiğinde API moduna geçer
 - Gelecekteki PostgreSQL şeması ve REST v1 sözleşmesi: `backend/`
+- Runtime geocoding provider ayarı: `public/geocoding-config.json`
 - Mobil öncelikli responsive arayüz
 - Vitest ile IndexedDB persistence/migration, takip ve Yakınımda sıralama/filtre testleri
 - GitHub Pages otomatik test/build/deploy
@@ -111,4 +113,5 @@ npm run preview
 - Fotoğraflar prototip aşamasında IndexedDB'de data URL olarak tutulur. Production backend'de object storage kullanılmalıdır.
 - Takip yerelde çalışır; yorum, moderasyon, bildirim gönderimi ve gerçek yetkili hesabı henüz backend'e bağlı değildir.
 - Harita tabanı prototipte doğrudan OpenStreetMap raster tile sunucusunu kullanır; gerçek trafik öncesi production tile altyapısı seçilmelidir.
+- Ters geocoding prototipte public Nominatim kullanır. Kullanım politikası gereği ağır trafik için uygun değildir; gerçek ölçek öncesi kendi/profesyonel geocoder altyapısına geçilmelidir.
 - Manifest mevcut olsa da production offline/PWA katmanı henüz tamamlanmış değildir.
