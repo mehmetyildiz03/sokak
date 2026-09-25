@@ -15,7 +15,7 @@ export const initialIssues: Issue[] = [
   },
   {
     id: 'iss-4', lng: 30.5630, lat: 37.7707, category: 'sidewalk', categoryLabel: 'Kaldırım', emoji: '🚧',
-    title: 'Kaldırım taşı çökmüş', place: 'Merkez · Okul önü', description: 'Yürürken takılma riski oluşturuyor.', confirms: 5, comments: 1, age: '8 saat', severity: 1, status: 'Yeni'
+    title: 'Kaldırım taşı çökmüş', place: 'Merkez · Okul önü', description: 'Yürürken takılma riski oluşturuyor.', confirms: 1, comments: 1, age: '8 saat', severity: 1, status: 'Yeni'
   },
   {
     id: 'iss-5', lng: 30.5458, lat: 37.7726, category: 'water', categoryLabel: 'Su / Kanalizasyon', emoji: '💧',
