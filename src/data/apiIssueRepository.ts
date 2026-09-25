@@ -1,7 +1,7 @@
 import { IssueRepositoryError, type ConfirmationResult, type IssueRepository } from './repository';
 import type { Issue } from '../types';
 
-interface ConfirmationListResponse {
+interface IssueIdListResponse {
   issueIds: string[];
 }
 
@@ -40,7 +40,12 @@ export class ApiIssueRepository implements IssueRepository {
   }
 
   async getConfirmedIssueIds(): Promise<string[]> {
-    const response = await this.request<ConfirmationListResponse>('/v1/me/confirmations');
+    const response = await this.request<IssueIdListResponse>('/v1/me/confirmations');
+    return response.issueIds;
+  }
+
+  async getFollowedIssueIds(): Promise<string[]> {
+    const response = await this.request<IssueIdListResponse>('/v1/me/follows');
     return response.issueIds;
   }
 
@@ -54,6 +59,12 @@ export class ApiIssueRepository implements IssueRepository {
   confirmIssue(issueId: string): Promise<ConfirmationResult> {
     return this.request<ConfirmationResult>(`/v1/issues/${encodeURIComponent(issueId)}/confirmations`, {
       method: 'POST',
+    });
+  }
+
+  async setIssueFollowed(issueId: string, followed: boolean): Promise<void> {
+    await this.request<{ followed: boolean }>(`/v1/issues/${encodeURIComponent(issueId)}/follow`, {
+      method: followed ? 'PUT' : 'DELETE',
     });
   }
 }
