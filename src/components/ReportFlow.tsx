@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { LocationPickerMap } from './LocationPickerMap';
 import type { Issue, IssueCategory, Point, ReportDraft } from '../types';
 import { distanceMeters } from '../utils';
 
@@ -165,10 +166,24 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
             <section className="report-step active">
               <div className="location-card">
                 <div className="location-icon">⌖</div>
-                <div><strong>Seçili konum</strong><p>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</p></div>
+                <div>
+                  <strong>Seçili konum</strong>
+                  <p>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</p>
+                </div>
               </div>
-              <button className="secondary-btn" onClick={useLocation}>Konumumu kullan</button>
-              <p className="helper">Konum izni vermezsen haritanın merkezindeki noktayı kullanırız. Pin sürükleme sonraki konum düzenleme adımına eklenecek.</p>
+
+              <LocationPickerMap
+                point={{ lng: draft.lng, lat: draft.lat }}
+                onChange={(point) => setDraft((current) => ({ ...current, ...point }))}
+              />
+
+              <button className="secondary-btn location-use-btn" onClick={useLocation}>
+                Konumumu kullan
+              </button>
+              <p className="helper">
+                Pini tam sorun noktasına sürükleyebilirsin. Haritanın başka bir yerine dokunursan pin oraya taşınır.
+                Konum izni vermezsen başlangıç noktası ana haritanın merkezidir.
+              </p>
             </section>
           )}
           {step === 2 && (
