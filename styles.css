@@ -687,3 +687,39 @@ button:disabled { cursor: default; }
     text-overflow: ellipsis;
   }
 }
+
+.review-location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  margin: -2px 0 13px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: white;
+}
+.review-location > span {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 19px;
+  font-weight: 900;
+}
+.review-location div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.review-location strong { font-size: 12px; }
+.review-location small {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
