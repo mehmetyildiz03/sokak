@@ -1,0 +1,5 @@
+{
+  "provider": "nominatim",
+  "endpoint": "https://nominatim.openstreetmap.org/reverse",
+  "enabled": true
+}
