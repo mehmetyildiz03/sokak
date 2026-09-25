@@ -21,6 +21,8 @@ export interface Issue extends Point {
   severity: 1 | 2 | 3;
   status: IssueStatus;
   photoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ReportDraft extends Point {
