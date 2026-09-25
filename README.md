@@ -9,6 +9,7 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 ### Şu anda çalışanlar
 - MapLibre tabanlı harita
 - Gerçek **Yakınımda** görünümü: cihaz konumu veya harita merkezine göre mesafe sıralaması, Açık/Tümü filtresi ve haritadaki soruna geri dönüş
+- Gerçek **Takip** görünümü: sorun detayından takip et/takibi bırak, cihazda kalıcı takip listesi, açık/çözülmüş özeti ve haritadaki soruna geri dönüş
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
 - Sorun detay bottom-sheet'i
 - İdempotent “Ben de gördüm” doğrulaması
@@ -16,14 +17,14 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 - Tarayıcı konum izni
 - Yakındaki aynı kategoride açık sorun için mükerrer bildirim uyarısı
 - Fotoğraflı yeni bildirim
-- **IndexedDB ile kalıcı sorun, fotoğraf ve bu cihazın doğrulama kayıtları**
+- **IndexedDB ile kalıcı sorun, fotoğraf, doğrulama ve takip kayıtları**
 - Sayfa yenilendiğinde yerel kayıtların yeniden yüklenmesi
 - IndexedDB kullanılamazsa açıkça belirtilen geçici oturum modu
 - Backend bağımsız `IssueRepository` sözleşmesi
 - Hazır REST adapter'ı: `VITE_API_BASE_URL` verildiğinde API moduna geçer
 - Gelecekteki PostgreSQL şeması ve REST v1 sözleşmesi: `backend/`
 - Mobil öncelikli responsive arayüz
-- Vitest ile IndexedDB persistence ve Yakınımda sıralama/filtre testleri
+- Vitest ile IndexedDB persistence/migration, takip ve Yakınımda sıralama/filtre testleri
 - GitHub Pages otomatik test/build/deploy
 
 ## Veri katmanı
@@ -68,6 +69,9 @@ API URL'si verildiğinde frontend şu sözleşmeyi kullanır:
 - `POST /v1/issues`
 - `GET /v1/me/confirmations`
 - `POST /v1/issues/:id/confirmations`
+- `GET /v1/me/follows`
+- `PUT /v1/issues/:id/follow`
+- `DELETE /v1/issues/:id/follow`
 
 Ayrıntı: `backend/README.md`
 
@@ -104,6 +108,6 @@ npm run preview
 - Veriler şimdilik **yalnız aynı tarayıcı/cihazda** kalıcıdır; kullanıcılar arasında paylaşılmaz.
 - Anonim `clientId` gerçek kullanıcı hesabı değildir.
 - Fotoğraflar prototip aşamasında IndexedDB'de data URL olarak tutulur. Production backend'de object storage kullanılmalıdır.
-- Yorum, takip, moderasyon ve gerçek yetkili hesabı henüz backend'e bağlı değildir.
+- Takip yerelde çalışır; yorum, moderasyon, bildirim gönderimi ve gerçek yetkili hesabı henüz backend'e bağlı değildir.
 - Harita tabanı prototipte doğrudan OpenStreetMap raster tile sunucusunu kullanır; gerçek trafik öncesi production tile altyapısı seçilmelidir.
 - Manifest mevcut olsa da production offline/PWA katmanı henüz tamamlanmış değildir.
