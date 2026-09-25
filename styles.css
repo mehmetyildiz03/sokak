@@ -38,8 +38,11 @@ button:disabled { cursor: default; }
 .mode-switch { position: absolute; z-index: 4; top: calc(env(safe-area-inset-top) + 88px); left: 14px; border-radius: 15px; padding: 4px; display: flex; gap: 4px; }
 .mode-btn { border: 0; border-radius: 11px; padding: 9px 13px; color: #566174; background: transparent; font-size: 13px; font-weight: 800; }
 .mode-btn.active { color: var(--brand); background: var(--brand-soft); }
-.map-legend { position: absolute; z-index: 3; right: 14px; top: calc(env(safe-area-inset-top) + 92px); display: flex; gap: 10px; align-items: center; border-radius: 14px; padding: 9px 11px; font-size: 11px; color: #5d6878; }
+.map-legend, .heat-legend { position: absolute; z-index: 3; right: 14px; top: calc(env(safe-area-inset-top) + 92px); border-radius: 14px; padding: 9px 11px; font-size: 11px; color: #5d6878; }
+.map-legend { display: flex; gap: 10px; align-items: center; }
 .map-legend span { display: flex; align-items: center; gap: 5px; }
+.heat-legend { display: grid; grid-template-columns: auto 74px auto; align-items: center; gap: 7px; }
+.heat-legend i { display: block; height: 8px; border-radius: 999px; background: linear-gradient(90deg,#7fd0c3,#ffd266,#f38b48,#d9473f); }
 .dot { width: 8px; height: 8px; border-radius: 99px; display: inline-block; }
 .dot-new { background: var(--new); }.dot-confirmed { background: var(--confirmed); }.dot-old { background: var(--old); }
 .report-fab { position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 62px); height: 54px; border: 0; border-radius: 999px; padding: 0 22px 0 15px; background: var(--brand); color: white; font-weight: 850; display: flex; align-items: center; gap: 8px; box-shadow: 0 14px 36px rgba(20,92,104,.33); }
@@ -73,7 +76,8 @@ button:disabled { cursor: default; }
   .modal-backdrop { align-items: center; padding: 16px; }
 }
 @media (max-width: 420px) {
-  .map-legend { display:none; }
+  .map-legend { top: calc(env(safe-area-inset-top) + 136px); flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px 10px; font-size: 10px; }
+  .heat-legend { top: calc(env(safe-area-inset-top) + 136px); grid-template-columns: auto 62px auto; font-size: 10px; }
 }
 
 .review-photo { margin-top: -2px; margin-bottom: 13px; }
