@@ -7,7 +7,7 @@ interface ReportFlowProps {
   center: Point;
   issues: Issue[];
   onClose: () => void;
-  onSubmit: (draft: ReportDraft) => void;
+  onSubmit: (draft: ReportDraft) => Promise<void>;
   onOpenIssue: (id: string) => void;
   requestLocation: () => Promise<Point>;
   notify: (message: string) => void;
@@ -31,12 +31,14 @@ function emptyDraft(center: Point): ReportDraft {
 export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssue, requestLocation, notify }: ReportFlowProps) {
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<ReportDraft>(() => emptyDraft(center));
+  const [submitting, setSubmitting] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setStep(1);
+    setSubmitting(false);
     setDraft(emptyDraft(center));
   }, [open]);
 
@@ -97,7 +99,7 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
     setDraft((current) => ({ ...current, category: key, categoryLabel: label, emoji }));
   };
 
-  const next = () => {
+  const next = async () => {
     if (step === 2 && !draft.category) {
       notify('Önce bir sorun kategorisi seç.');
       return;
@@ -106,8 +108,18 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
       notify('Sorunu birkaç kelimeyle daha net anlat.');
       return;
     }
-    if (step < 4) setStep((value) => value + 1);
-    else onSubmit({ ...draft, description: draft.description.trim() });
+    if (step < 4) {
+      setStep((value) => value + 1);
+      return;
+    }
+
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({ ...draft, description: draft.description.trim() });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const useLocation = async () => {
@@ -219,8 +231,10 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
           )}
         </div>
         <footer className="modal-footer">
-          <button className="secondary-btn compact" disabled={step === 1} onClick={() => setStep((value) => Math.max(1, value - 1))}>Geri</button>
-          <button className="primary-btn compact" onClick={next}>{step === 4 ? 'Bildirimi gönder' : 'Devam'}</button>
+          <button className="secondary-btn compact" disabled={step === 1 || submitting} onClick={() => setStep((value) => Math.max(1, value - 1))}>Geri</button>
+          <button className="primary-btn compact" disabled={submitting} onClick={() => void next()}>
+            {submitting ? 'Kaydediliyor…' : step === 4 ? 'Bildirimi gönder' : 'Devam'}
+          </button>
         </footer>
       </section>
     </div>
