@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LocationPickerMap } from './LocationPickerMap';
+import { reverseGeocode } from '../data/reverseGeocode';
 import type { Issue, IssueCategory, Point, ReportDraft } from '../types';
 import { distanceMeters } from '../utils';
 
@@ -26,13 +27,15 @@ const categories: Array<{ key: IssueCategory; label: string; emoji: string }> = 
 const stepTitles = ['Sorun nerede?', 'Ne tür bir sorun?', 'Ne oluyor?', 'Kontrol et ve gönder'];
 
 function emptyDraft(center: Point): ReportDraft {
-  return { ...center, category: null, categoryLabel: '', emoji: '📍', description: '', photoUrl: '' };
+  return { ...center, category: null, categoryLabel: '', emoji: '📍', place: '', description: '', photoUrl: '' };
 }
 
 export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssue, requestLocation, notify }: ReportFlowProps) {
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<ReportDraft>(() => emptyDraft(center));
   const [submitting, setSubmitting] = useState(false);
+  const [addressStatus, setAddressStatus] = useState<'loading' | 'resolved' | 'failed'>('loading');
+  const addressRequestRef = useRef(0);
   const dialogRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -40,8 +43,42 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
     if (!open) return;
     setStep(1);
     setSubmitting(false);
+    setAddressStatus('loading');
     setDraft(emptyDraft(center));
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const requestId = ++addressRequestRef.current;
+    const point = { lat: draft.lat, lng: draft.lng };
+    setAddressStatus('loading');
+
+    const timer = window.setTimeout(() => {
+      void reverseGeocode(point)
+        .then((label) => {
+          if (requestId !== addressRequestRef.current) return;
+
+          if (label) {
+            setDraft((current) => (
+              current.lat === point.lat && current.lng === point.lng
+                ? { ...current, place: label }
+                : current
+            ));
+            setAddressStatus('resolved');
+          } else {
+            setAddressStatus('failed');
+          }
+        })
+        .catch(() => {
+          if (requestId === addressRequestRef.current) {
+            setAddressStatus('failed');
+          }
+        });
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [open, draft.lat, draft.lng]);
 
   useEffect(() => {
     if (!open) return;
@@ -126,7 +163,7 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
   const useLocation = async () => {
     try {
       const point = await requestLocation();
-      setDraft((current) => ({ ...current, ...point }));
+      setDraft((current) => ({ ...current, ...point, place: '' }));
       notify('Konum seçildi.');
     } catch {
       notify('Konum alınamadı; harita merkezi kullanılacak.');
@@ -167,14 +204,18 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
               <div className="location-card">
                 <div className="location-icon">⌖</div>
                 <div>
-                  <strong>Seçili konum</strong>
+                  <strong>
+                    {addressStatus === 'loading'
+                      ? 'Adres aranıyor…'
+                      : draft.place || 'Konum adı bulunamadı'}
+                  </strong>
                   <p>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</p>
                 </div>
               </div>
 
               <LocationPickerMap
                 point={{ lng: draft.lng, lat: draft.lat }}
-                onChange={(point) => setDraft((current) => ({ ...current, ...point }))}
+                onChange={(point) => setDraft((current) => ({ ...current, ...point, place: '' }))}
               />
 
               <button className="secondary-btn location-use-btn" onClick={useLocation}>
@@ -183,6 +224,9 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
               <p className="helper">
                 Pini tam sorun noktasına sürükleyebilirsin. Haritanın başka bir yerine dokunursan pin oraya taşınır.
                 Konum izni vermezsen başlangıç noktası ana haritanın merkezidir.
+              </p>
+              <p className="geocoding-note">
+                Adres verisi © OpenStreetMap katkıda bulunanlar · Seçilen koordinat adres adı için Nominatim’e gönderilir.
               </p>
             </section>
           )}
@@ -230,7 +274,7 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
               <div className="review-location">
                 <span aria-hidden="true">⌖</span>
                 <div>
-                  <strong>Bildirim konumu</strong>
+                  <strong>{draft.place || 'Konum adı bulunamadı'}</strong>
                   <small>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</small>
                 </div>
               </div>
