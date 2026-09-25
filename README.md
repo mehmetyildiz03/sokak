@@ -78,6 +78,13 @@ API URL'si verildiğinde frontend şu sözleşmeyi kullanır:
 
 Ayrıntı: `backend/README.md`
 
+
+## Ters geocoding
+
+Sorun konumu değiştikten sonra yaklaşık 0,9 saniye beklenir; ardından seçilen koordinat insan tarafından okunabilir mahalle/sokak etiketine çevrilir. Sonuçlar aynı koordinat için tekrar sorgu yapılmaması amacıyla tarayıcıda sınırlı süre cache'lenir.
+
+Provider çalışma zamanında `public/geocoding-config.json` üzerinden seçilir. Prototipte public Nominatim kullanılır. Public Nominatim ağır trafik için tasarlanmamıştır; uygulama tarafında istekler seri ve en az 1,1 saniye aralıklı yapılır. Gerçek ölçek öncesi profesyonel veya kendi geocoding altyapımıza geçilmelidir.
+
 ## Teknoloji
 - React 19.3
 - TypeScript 7
