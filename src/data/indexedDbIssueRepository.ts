@@ -37,9 +37,9 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function openDatabase(): Promise<IDBDatabase> {
+function openDatabase(dbName: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(dbName, DB_VERSION);
 
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -72,9 +72,14 @@ function normalizeIssue(issue: Issue): Issue {
 }
 
 export class IndexedDbIssueRepository implements IssueRepository {
-  private readonly dbPromise = openDatabase();
+  private readonly dbPromise: Promise<IDBDatabase>;
 
-  constructor(private readonly clientId: string) {}
+  constructor(
+    private readonly clientId: string,
+    dbName = DB_NAME,
+  ) {
+    this.dbPromise = openDatabase(dbName);
+  }
 
   private async ensureSeeded(): Promise<void> {
     const db = await this.dbPromise;
