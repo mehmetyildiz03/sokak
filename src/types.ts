@@ -29,6 +29,7 @@ export interface ReportDraft extends Point {
   category: IssueCategory | null;
   categoryLabel: string;
   emoji: string;
+  place: string;
   description: string;
   photoUrl: string;
 }
