@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Issue, IssueCategory, Point, ReportDraft } from '../types';
 import { distanceMeters } from '../utils';
 
@@ -31,6 +31,8 @@ function emptyDraft(center: Point): ReportDraft {
 export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssue, requestLocation, notify }: ReportFlowProps) {
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<ReportDraft>(() => emptyDraft(center));
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -40,11 +42,42 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
 
   useEffect(() => {
     if (!open) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusTimer = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), textarea, input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.offsetParent !== null);
+
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(focusTimer);
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
   }, [open, onClose]);
 
   const similarIssue = useMemo(() => {
@@ -108,9 +141,9 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
 
   return (
     <div className="modal-backdrop open" aria-hidden="false" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
-      <section className="report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+      <section ref={dialogRef} className="report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
         <header className="modal-header">
-          <button className="icon-btn plain" onClick={onClose} aria-label="Kapat">×</button>
+          <button ref={closeButtonRef} className="icon-btn plain" onClick={onClose} aria-label="Kapat">×</button>
           <div><span className="eyebrow">{step} / 4</span><h2 id="reportTitle">{stepTitles[step - 1]}</h2></div>
           <span className="header-spacer" />
         </header>
