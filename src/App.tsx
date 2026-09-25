@@ -159,11 +159,15 @@ export default function App() {
           </button>
         </div>
 
-        {mode === 'issues' && (
-          <aside className="map-legend glass">
+        {mode === 'issues' ? (
+          <aside className="map-legend glass" aria-label="Sorun durumları">
             <span><i className="dot dot-new" /> Yeni</span>
             <span><i className="dot dot-confirmed" /> Doğrulandı</span>
             <span><i className="dot dot-old" /> Uzun süredir açık</span>
+          </aside>
+        ) : (
+          <aside className="heat-legend glass" aria-label="Sorun yoğunluğu">
+            <span>Az</span><i aria-hidden="true" /><span>Yoğun</span>
           </aside>
         )}
 
