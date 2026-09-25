@@ -35,6 +35,15 @@ create table if not exists confirmations (
 
 create index if not exists confirmations_client_idx on confirmations(client_id);
 
+create table if not exists follows (
+  issue_id text not null references issues(id) on delete cascade,
+  client_id text not null,
+  created_at timestamptz not null default now(),
+  primary key (issue_id, client_id)
+);
+
+create index if not exists follows_client_idx on follows(client_id);
+
 create table if not exists comments (
   id text primary key,
   issue_id text not null references issues(id) on delete cascade,
