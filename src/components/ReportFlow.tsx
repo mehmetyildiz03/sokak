@@ -89,6 +89,14 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
 
   const addPhoto = (file?: File) => {
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      notify('Yalnızca fotoğraf dosyası ekleyebilirsin.');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      notify('Fotoğraf 8 MB’dan küçük olmalı.');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result !== 'string') return;
