@@ -17,7 +17,15 @@ function makeGeoJson(issues: Issue[]) {
     features: issues.map((issue) => ({
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: [issue.lng, issue.lat] },
-      properties: { ...issue },
+      properties: {
+        ...issue,
+        heatWeight: Math.min(
+          1,
+          (issue.severity / 3) * 0.55 +
+          Math.min(0.3, Math.log2(issue.confirms + 1) / 16) +
+          (issue.status === 'Uzun süredir açık' ? 0.15 : 0),
+        ),
+      },
     })),
   };
 }
@@ -65,7 +73,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
         maxzoom: 17,
         layout: { visibility: 'none' },
         paint: {
-          'heatmap-weight': ['interpolate', ['linear'], ['get', 'severity'], 1, 0.35, 3, 1],
+          'heatmap-weight': ['get', 'heatWeight'],
           'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 16, 2],
           'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 10, 22, 16, 50],
           'heatmap-opacity': 0.72,
@@ -78,7 +86,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
         source: 'issues',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 11, 16, 19],
-          'circle-color': ['match', ['get', 'severity'], 1, '#7d8898', 2, '#f0a728', 3, '#de5a45', '#7d8898'],
+          'circle-color': ['match', ['get', 'status'], 'Yeni', '#7d8898', 'Doğrulandı', '#f0a728', 'Uzun süredir açık', '#de5a45', 'İşlemde', '#3478c7', 'Çözüldü', '#2f9d6b', '#7d8898'],
           'circle-opacity': 0.18,
           'circle-blur': 0.35,
         },
@@ -89,7 +97,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
         source: 'issues',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 6, 16, 9],
-          'circle-color': ['match', ['get', 'severity'], 1, '#7d8898', 2, '#f0a728', 3, '#de5a45', '#7d8898'],
+          'circle-color': ['match', ['get', 'status'], 'Yeni', '#7d8898', 'Doğrulandı', '#f0a728', 'Uzun süredir açık', '#de5a45', 'İşlemde', '#3478c7', 'Çözüldü', '#2f9d6b', '#7d8898'],
           'circle-stroke-width': 3,
           'circle-stroke-color': '#ffffff',
         },
