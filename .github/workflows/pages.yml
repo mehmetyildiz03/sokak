@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -26,10 +26,22 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: package-lock.json
+      - name: Sync lockfile for test dependencies
+        run: |
+          npm install --package-lock-only --ignore-scripts
+          if ! git diff --quiet package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: sync npm lockfile"
+            git push
+          fi
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Install dependencies
         run: npm ci
+      - name: Persistence tests
+        run: npm test
       - name: Build
         run: npm run build
       - name: Upload Pages artifact
