@@ -99,6 +99,7 @@ export default function App() {
     };
 
     setIssues((current) => [issue, ...current]);
+    setConfirmedIssueIds((current) => [...current, issue.id]);
     setReportOpen(false);
     setSelectedIssueId(issue.id);
     setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
