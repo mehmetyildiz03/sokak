@@ -79,6 +79,7 @@ export class IndexedDbIssueRepository implements IssueRepository {
   private async ensureSeeded(): Promise<void> {
     const db = await this.dbPromise;
     const tx = db.transaction([META_STORE, ISSUE_STORE], 'readwrite');
+    const done = transactionDone(tx);
     const metaStore = tx.objectStore(META_STORE);
     const issueStore = tx.objectStore(ISSUE_STORE);
 
@@ -89,15 +90,16 @@ export class IndexedDbIssueRepository implements IssueRepository {
       metaStore.put({ key: SEED_KEY, value: new Date().toISOString() } satisfies MetaRecord);
     }
 
-    await transactionDone(tx);
+    await done;
   }
 
   async listIssues(): Promise<Issue[]> {
     await this.ensureSeeded();
     const db = await this.dbPromise;
     const tx = db.transaction(ISSUE_STORE, 'readonly');
+    const done = transactionDone(tx);
     const issues = await requestToPromise(tx.objectStore(ISSUE_STORE).getAll() as IDBRequest<Issue[]>);
-    await transactionDone(tx);
+    await done;
 
     return issues
       .map(normalizeIssue)
@@ -113,9 +115,10 @@ export class IndexedDbIssueRepository implements IssueRepository {
     await this.ensureSeeded();
     const db = await this.dbPromise;
     const tx = db.transaction(CONFIRMATION_STORE, 'readonly');
+    const done = transactionDone(tx);
     const index = tx.objectStore(CONFIRMATION_STORE).index('by-client');
     const confirmations = await requestToPromise(index.getAll(this.clientId) as IDBRequest<StoredConfirmation[]>);
-    await transactionDone(tx);
+    await done;
     return confirmations.map((confirmation) => confirmation.issueId);
   }
 
@@ -129,9 +132,16 @@ export class IndexedDbIssueRepository implements IssueRepository {
       updatedAt: now,
     };
 
-    const tx = db.transaction(ISSUE_STORE, 'readwrite');
+    const tx = db.transaction([ISSUE_STORE, CONFIRMATION_STORE], 'readwrite');
+    const done = transactionDone(tx);
     tx.objectStore(ISSUE_STORE).put(stored);
-    await transactionDone(tx);
+    tx.objectStore(CONFIRMATION_STORE).put({
+      key: `${this.clientId}:${stored.id}`,
+      issueId: stored.id,
+      clientId: this.clientId,
+      createdAt: now,
+    } satisfies StoredConfirmation);
+    await done;
     return normalizeIssue(stored);
   }
 
@@ -139,6 +149,7 @@ export class IndexedDbIssueRepository implements IssueRepository {
     await this.ensureSeeded();
     const db = await this.dbPromise;
     const tx = db.transaction([ISSUE_STORE, CONFIRMATION_STORE], 'readwrite');
+    const done = transactionDone(tx);
     const issueStore = tx.objectStore(ISSUE_STORE);
     const confirmationStore = tx.objectStore(CONFIRMATION_STORE);
     const confirmationKey = `${this.clientId}:${issueId}`;
@@ -149,17 +160,17 @@ export class IndexedDbIssueRepository implements IssueRepository {
     ]);
 
     if (!issue) {
-      tx.abort();
+      await done;
       throw new IssueRepositoryError('Sorun kaydı bulunamadı.');
     }
 
     if (existing) {
-      await transactionDone(tx);
+      await done;
       return { issue: normalizeIssue(issue), alreadyConfirmed: true };
     }
 
     if (issue.status === 'Çözüldü') {
-      tx.abort();
+      await done;
       throw new IssueRepositoryError('Çözülmüş bir sorun yeniden doğrulanamaz.');
     }
 
@@ -179,7 +190,7 @@ export class IndexedDbIssueRepository implements IssueRepository {
       createdAt: new Date().toISOString(),
     } satisfies StoredConfirmation);
 
-    await transactionDone(tx);
+    await done;
     return { issue: normalizeIssue(updated), alreadyConfirmed: false };
   }
 }
