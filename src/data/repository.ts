@@ -8,8 +8,10 @@ export interface ConfirmationResult {
 export interface IssueRepository {
   listIssues(): Promise<Issue[]>;
   getConfirmedIssueIds(): Promise<string[]>;
+  getFollowedIssueIds(): Promise<string[]>;
   createIssue(issue: Issue): Promise<Issue>;
   confirmIssue(issueId: string): Promise<ConfirmationResult>;
+  setIssueFollowed(issueId: string, followed: boolean): Promise<void>;
 }
 
 export class IssueRepositoryError extends Error {
