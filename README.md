@@ -8,6 +8,7 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 
 ### Şu anda çalışanlar
 - MapLibre tabanlı harita
+- Gerçek **Yakınımda** görünümü: cihaz konumu veya harita merkezine göre mesafe sıralaması, Açık/Tümü filtresi ve haritadaki soruna geri dönüş
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
 - Sorun detay bottom-sheet'i
 - İdempotent “Ben de gördüm” doğrulaması
@@ -22,7 +23,8 @@ v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalışt�
 - Hazır REST adapter'ı: `VITE_API_BASE_URL` verildiğinde API moduna geçer
 - Gelecekteki PostgreSQL şeması ve REST v1 sözleşmesi: `backend/`
 - Mobil öncelikli responsive arayüz
-- GitHub Pages otomatik build/deploy
+- Vitest ile IndexedDB persistence ve Yakınımda sıralama/filtre testleri
+- GitHub Pages otomatik test/build/deploy
 
 ## Veri katmanı
 
