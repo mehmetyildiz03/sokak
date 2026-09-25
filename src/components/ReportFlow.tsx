@@ -54,7 +54,7 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
         issue,
         distance: distanceMeters(issue.lat, issue.lng, draft.lat, draft.lng),
       }))
-      .filter(({ issue, distance }) => issue.category === draft.category && distance < 160)
+      .filter(({ issue, distance }) => issue.status !== 'Çözüldü' && issue.category === draft.category && distance < 160)
       .sort((a, b) => a.distance - b.distance)[0] ?? null;
   }, [draft, issues]);
 
