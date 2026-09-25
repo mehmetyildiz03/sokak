@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapView } from './components/MapView';
+import { FollowPanel } from './components/FollowPanel';
 import { IssueSheet } from './components/IssueSheet';
 import { NearbyPanel } from './components/NearbyPanel';
 import { ReportFlow } from './components/ReportFlow';
@@ -20,8 +21,9 @@ export default function App() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [confirmedIssueIds, setConfirmedIssueIds] = useState<string[]>([]);
+  const [followedIssueIds, setFollowedIssueIds] = useState<string[]>([]);
   const [mode, setMode] = useState<MapMode>('issues');
-  const [activeView, setActiveView] = useState<'map' | 'nearby'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'nearby' | 'following'>('map');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [nearbyOrigin, setNearbyOrigin] = useState<Point>(initialCenter);
   const [nearbyDeviceOrigin, setNearbyDeviceOrigin] = useState<Point | null>(null);
@@ -47,10 +49,12 @@ export default function App() {
     void Promise.all([
       repository.listIssues(),
       repository.getConfirmedIssueIds(),
-    ]).then(([storedIssues, confirmedIds]) => {
+      repository.getFollowedIssueIds(),
+    ]).then(([storedIssues, confirmedIds, followedIds]) => {
       if (cancelled) return;
       setIssues(storedIssues);
       setConfirmedIssueIds(confirmedIds);
+      setFollowedIssueIds(followedIds);
     }).catch(() => {
       if (cancelled) return;
       setPersistenceAvailable(false);
@@ -174,6 +178,30 @@ export default function App() {
     }
   };
 
+  const toggleFollow = async (id: string) => {
+    const shouldFollow = !followedIssueIds.includes(id);
+
+    if (!persistenceAvailable) {
+      setFollowedIssueIds((current) =>
+        shouldFollow ? [...current, id] : current.filter((item) => item !== id),
+      );
+      notify(shouldFollow ? 'Sorun bu oturum için takip ediliyor.' : 'Takip bu oturum için kaldırıldı.');
+      return;
+    }
+
+    try {
+      await repository.setIssueFollowed(id, shouldFollow);
+      setFollowedIssueIds((current) =>
+        shouldFollow
+          ? (current.includes(id) ? current : [...current, id])
+          : current.filter((item) => item !== id),
+      );
+      notify(shouldFollow ? 'Sorun takip listene eklendi.' : 'Sorun takibinden çıkarıldı.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Takip durumu güncellenemedi.');
+    }
+  };
+
   const openExistingIssue = (id: string) => {
     const issue = issues.find((item) => item.id === id);
     if (!issue) return;
@@ -262,7 +290,16 @@ export default function App() {
           />
         )}
 
-        <header className={`topbar glass ${activeView === 'nearby' ? 'under-panel' : ''}`}>
+        {activeView === 'following' && (
+          <FollowPanel
+            issues={issues}
+            followedIssueIds={followedIssueIds}
+            onSelectIssue={openExistingIssue}
+            onUnfollow={(id) => void toggleFollow(id)}
+          />
+        )}
+
+        <header className={`topbar glass ${activeView !== 'map' ? 'under-panel' : ''}`}>
           <button className="icon-btn" onClick={locateFromHeader} aria-label="Konumumu bul">⌖</button>
           <button
             className="location-pill"
@@ -325,8 +362,10 @@ export default function App() {
         <IssueSheet
           issue={selectedIssue}
           confirmed={selectedIssue ? confirmedIssueIds.includes(selectedIssue.id) : false}
+          followed={selectedIssue ? followedIssueIds.includes(selectedIssue.id) : false}
           onClose={() => setSelectedIssueId(null)}
           onConfirm={confirmIssue}
+          onToggleFollow={(id) => void toggleFollow(id)}
         />
 
         <nav className="bottom-nav glass" aria-label="Ana menü">
@@ -347,10 +386,14 @@ export default function App() {
           </button>
           <span className="nav-spacer" aria-hidden="true" />
           <button
-            className="nav-item"
-            onClick={() => notify('Takip edilen sorunlar kullanıcı hesabıyla bağlanacak.')}
+            className={`nav-item ${activeView === 'following' ? 'active' : ''}`}
+            onClick={() => {
+              setSelectedIssueId(null);
+              setReportOpen(false);
+              setActiveView('following');
+            }}
           >
-            <span>♡</span><small>Takip</small>
+            <span>{followedIssueIds.length > 0 ? '♥' : '♡'}</span><small>Takip</small>
           </button>
           <button
             className="nav-item"
