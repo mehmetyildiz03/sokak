@@ -9,9 +9,9 @@ Mahalle ve sokak ölçeğindeki kamusal sorunları harita üzerinde görünür, 
 ### Şu anda çalışanlar
 - MapLibre tabanlı harita
 - Harita üzerinde örnek sorun kayıtları
-- Sorun / yoğunluk görünümü
+- Sorun / yoğunluk görünümü; yakın zoom'da yoğunluktan gerçek sorun noktalarına geçiş
 - Sorun detay bottom-sheet'i
-- “Ben de gördüm” doğrulaması
+- Tekrarlı tıklamayı engelleyen “Ben de gördüm” doğrulaması
 - Dört adımlı sorun bildirme akışı
 - Tarayıcı konum izni
 - 160 metre içinde aynı kategoride olası mükerrer bildirim uyarısı
@@ -28,7 +28,7 @@ Mahalle ve sokak ölçeğindeki kamusal sorunları harita üzerinde görünür, 
 ## Yerelde çalıştırma
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -47,7 +47,9 @@ npm run preview
 
 ## Not
 
-Prototipte harita tabanı doğrudan OpenStreetMap raster tile sunucusunu kullanır. Bu kullanım geliştirme/prototip içindir; gerçek trafik almadan önce production'a uygun tile sağlayıcısı veya kendi harita altyapımız seçilmelidir.
+- Prototipte harita tabanı doğrudan OpenStreetMap raster tile sunucusunu kullanır. Bu kullanım geliştirme/prototip içindir; gerçek trafik almadan önce production'a uygun tile sağlayıcısı veya kendi harita altyapımız seçilmelidir.
+- v0.2 verileri tarayıcı belleğindedir; sayfa yenilendiğinde kullanıcı tarafından eklenen bildirimler ve doğrulamalar kaybolur.
+- Manifest mevcut olsa da production PWA/offline katmanı henüz tamamlanmış değildir.
 
 ## Sonraki ürün katmanı
 
