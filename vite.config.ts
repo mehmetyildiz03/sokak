@@ -5,6 +5,6 @@ export default defineConfig({
   base: '/sokak/',
   plugins: [react()],
   build: {
-    sourcemap: true,
+    sourcemap: false,
   },
 });
