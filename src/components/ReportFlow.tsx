@@ -167,6 +167,7 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
                 <div className="review-emoji">{draft.emoji}</div>
                 <div><span className="eyebrow">Yeni bildirim</span><h3>{draft.categoryLabel || 'Kategori seçilmedi'}</h3><p>{draft.description || 'Açıklama eklenmedi.'}</p></div>
               </div>
+              {draft.photoUrl && <div className="photo-preview review-photo" style={{ backgroundImage: `url(${draft.photoUrl})` }} />}
               {similarIssue && (
                 <div className="similar-warning">
                   <strong>Yakında benzer bir bildirim var.</strong>
