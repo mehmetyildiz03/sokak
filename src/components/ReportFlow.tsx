@@ -226,7 +226,8 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
                 Konum izni vermezsen başlangıç noktası ana haritanın merkezidir.
               </p>
               <p className="geocoding-note">
-                Adres verisi © OpenStreetMap katkıda bulunanlar · Seçilen koordinat adres adı için Nominatim’e gönderilir.
+                Adres verisi <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap katkıda bulunanlar</a>.
+                Seçilen koordinat adres adı için Nominatim’e gönderilir.
               </p>
             </section>
           )}
@@ -274,7 +275,11 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
               <div className="review-location">
                 <span aria-hidden="true">⌖</span>
                 <div>
-                  <strong>{draft.place || 'Konum adı bulunamadı'}</strong>
+                  <strong>
+                    {addressStatus === 'loading'
+                      ? 'Adres aranıyor…'
+                      : draft.place || 'Konum adı bulunamadı'}
+                  </strong>
                   <small>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</small>
                 </div>
               </div>
@@ -288,7 +293,7 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
                     className="similar-action"
                     onClick={() => onOpenIssue(similarIssue.issue.id)}
                   >
-                    Bu sorunu aç ve doğrula
+                    Mevcut sorunu aç
                   </button>
                 </div>
               )}
