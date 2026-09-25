@@ -2,19 +2,28 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapView } from './components/MapView';
 import { IssueSheet } from './components/IssueSheet';
 import { ReportFlow } from './components/ReportFlow';
+import { createIssueRepository } from './data/createIssueRepository';
 import { initialIssues } from './data/issues';
 import type { Issue, MapMode, Point, ReportDraft } from './types';
 
 const initialCenter: Point = { lng: 30.5566, lat: 37.7648 };
 
+function createIssueId(): string {
+  return typeof crypto.randomUUID === 'function'
+    ? `iss-${crypto.randomUUID()}`
+    : `iss-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function App() {
-  const [issues, setIssues] = useState<Issue[]>(initialIssues);
+  const repository = useMemo(() => createIssueRepository(), []);
+  const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [confirmedIssueIds, setConfirmedIssueIds] = useState<string[]>([]);
   const [mode, setMode] = useState<MapMode>('issues');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [focus, setFocus] = useState<(Point & { key: number }) | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [dataReady, setDataReady] = useState(false);
   const [toast, setToast] = useState('');
 
   const selectedIssue = useMemo(
@@ -22,13 +31,36 @@ export default function App() {
     [issues, selectedIssueId],
   );
 
+  const notify = (message: string) => setToast(message);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all([
+      repository.listIssues(),
+      repository.getConfirmedIssueIds(),
+    ]).then(([storedIssues, confirmedIds]) => {
+      if (cancelled) return;
+      setIssues(storedIssues);
+      setConfirmedIssueIds(confirmedIds);
+    }).catch(() => {
+      if (cancelled) return;
+      setIssues(initialIssues);
+      notify('Yerel veri deposu açılamadı; bu oturum geçici modda çalışıyor.');
+    }).finally(() => {
+      if (!cancelled) setDataReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repository]);
+
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(''), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
-
-  const notify = (message: string) => setToast(message);
 
   const requestLocation = (): Promise<Point> => new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -56,22 +88,29 @@ export default function App() {
     }
   };
 
-  const confirmIssue = (id: string) => {
+  const confirmIssue = async (id: string) => {
     if (confirmedIssueIds.includes(id)) {
       notify('Bu sorunu zaten doğruladın.');
       return;
     }
-    setIssues((current) => current.map((issue) => {
-      if (issue.id !== id) return issue;
-      const confirms = issue.confirms + 1;
-      return {
-        ...issue,
-        confirms,
-        status: issue.status === 'Yeni' && confirms >= 2 ? 'Doğrulandı' : issue.status,
-      };
-    }));
-    setConfirmedIssueIds((current) => [...current, id]);
-    notify('Doğrulaman kaydedildi. Teşekkürler.');
+
+    try {
+      const result = await repository.confirmIssue(id);
+
+      setIssues((current) => current.map((issue) =>
+        issue.id === id ? result.issue : issue,
+      ));
+
+      setConfirmedIssueIds((current) =>
+        current.includes(id) ? current : [...current, id],
+      );
+
+      notify(result.alreadyConfirmed
+        ? 'Bu sorunu zaten doğruladın.'
+        : 'Doğrulaman kaydedildi. Teşekkürler.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Doğrulama kaydedilemedi.');
+    }
   };
 
   const openExistingIssue = (id: string) => {
@@ -83,11 +122,12 @@ export default function App() {
     setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
   };
 
-  const submitReport = (draft: ReportDraft) => {
+  const submitReport = async (draft: ReportDraft): Promise<void> => {
     if (!draft.category) return;
 
+    const now = new Date().toISOString();
     const issue: Issue = {
-      id: `iss-${Date.now()}`,
+      id: createIssueId(),
       lng: draft.lng,
       lat: draft.lat,
       category: draft.category,
@@ -102,14 +142,23 @@ export default function App() {
       severity: 1,
       status: 'Yeni',
       photoUrl: draft.photoUrl || undefined,
+      createdAt: now,
+      updatedAt: now,
     };
 
-    setIssues((current) => [issue, ...current]);
-    setConfirmedIssueIds((current) => [...current, issue.id]);
-    setReportOpen(false);
-    setSelectedIssueId(issue.id);
-    setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
-    notify('Bildirim haritaya eklendi.');
+    try {
+      const stored = await repository.createIssue(issue);
+      setIssues((current) => [stored, ...current.filter((item) => item.id !== stored.id)]);
+      setConfirmedIssueIds((current) =>
+        current.includes(stored.id) ? current : [...current, stored.id],
+      );
+      setReportOpen(false);
+      setSelectedIssueId(stored.id);
+      setFocus({ lng: stored.lng, lat: stored.lat, key: Date.now() });
+      notify('Bildirim bu cihazda kalıcı olarak kaydedildi.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Bildirim kaydedilemedi.');
+    }
   };
 
   return (
@@ -122,6 +171,13 @@ export default function App() {
           onSelectIssue={setSelectedIssueId}
           onCenterChange={setCenter}
         />
+
+        {!dataReady && (
+          <div className="data-loading glass" role="status" aria-live="polite">
+            <span className="loading-dot" />
+            Kayıtlar yükleniyor
+          </div>
+        )}
 
         <header className="topbar glass">
           <button className="icon-btn" onClick={locateFromHeader} aria-label="Konumumu bul">⌖</button>
@@ -173,6 +229,7 @@ export default function App() {
 
         <button
           className="report-fab"
+          disabled={!dataReady}
           onClick={() => {
             setSelectedIssueId(null);
             setReportOpen(true);
@@ -195,7 +252,7 @@ export default function App() {
           </button>
           <button
             className="nav-item"
-            onClick={() => notify('Yakınımda listesi v0.3 kapsamında açılacak.')}
+            onClick={() => notify('Yakınımda listesi sonraki ürün adımında açılacak.')}
           >
             <span>◎</span><small>Yakınımda</small>
           </button>
@@ -208,7 +265,7 @@ export default function App() {
           </button>
           <button
             className="nav-item"
-            onClick={() => notify('Profil ve kimlik doğrulama backend aşamasında eklenecek.')}
+            onClick={() => notify('Profil ve gerçek kimlik doğrulama backend aşamasında eklenecek.')}
           >
             <span>○</span><small>Profil</small>
           </button>
