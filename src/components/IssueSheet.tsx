@@ -56,10 +56,10 @@ export function IssueSheet({ issue, confirmed, onClose, onConfirm }: IssueSheetP
         <div className="progress-labels"><span>Bildirildi</span><span>Doğrulandı</span><span>İşlemde</span><span>Çözüldü</span></div>
         <button
           className="primary-btn"
-          disabled={confirmed}
+          disabled={confirmed || issue.status === 'Çözüldü'}
           onClick={() => onConfirm(issue.id)}
         >
-          {confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
+          {issue.status === 'Çözüldü' ? 'Sorun çözüldü' : confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
         </button>
       </div>
     </section>
