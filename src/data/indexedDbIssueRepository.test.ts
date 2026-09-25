@@ -33,6 +33,30 @@ function makeIssue(overrides: Partial<Issue> = {}): Issue {
   };
 }
 
+function createLegacyV1Database(name: string, issue: Issue): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(name, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const issues = db.createObjectStore('issues', { keyPath: 'id' });
+      const confirmations = db.createObjectStore('confirmations', { keyPath: 'key' });
+      confirmations.createIndex('by-client', 'clientId', { unique: false });
+      confirmations.createIndex('by-issue', 'issueId', { unique: false });
+      const meta = db.createObjectStore('meta', { keyPath: 'key' });
+
+      issues.put(issue);
+      meta.put({ key: 'seed:v1', value: new Date().toISOString() });
+    };
+
+    request.onsuccess = () => {
+      request.result.close();
+      resolve();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
 describe('IndexedDbIssueRepository persistence', () => {
   it('persists a created issue, its photo and author confirmation across repository instances', async () => {
     const name = dbName('reload');
@@ -96,6 +120,38 @@ describe('IndexedDbIssueRepository persistence', () => {
     expect(afterReload).toHaveLength(5);
     expect(issue?.confirms).toBe(2);
     expect(issue?.status).toBe('Doğrulandı');
+  });
+
+  it('persists follow and unfollow state across repository instances', async () => {
+    const name = dbName('follow');
+    const client = new IndexedDbIssueRepository('client-follower', name);
+    const issue = makeIssue({ id: 'iss-followed' });
+    await client.createIssue(issue);
+
+    await client.setIssueFollowed(issue.id, true);
+
+    const reopened = new IndexedDbIssueRepository('client-follower', name);
+    expect(await reopened.getFollowedIssueIds()).toContain(issue.id);
+
+    await reopened.setIssueFollowed(issue.id, false);
+
+    const afterUnfollow = new IndexedDbIssueRepository('client-follower', name);
+    expect(await afterUnfollow.getFollowedIssueIds()).not.toContain(issue.id);
+  });
+
+  it('upgrades a v1 database to v2 without losing existing issue data', async () => {
+    const name = dbName('migration');
+    const legacyIssue = makeIssue({ id: 'iss-legacy', title: 'v1 kaydı' });
+    await createLegacyV1Database(name, legacyIssue);
+
+    const upgraded = new IndexedDbIssueRepository('client-upgraded', name);
+    const issues = await upgraded.listIssues();
+
+    expect(issues.find((issue) => issue.id === legacyIssue.id)?.title).toBe('v1 kaydı');
+    expect(await upgraded.getFollowedIssueIds()).toEqual([]);
+
+    await upgraded.setIssueFollowed(legacyIssue.id, true);
+    expect(await upgraded.getFollowedIssueIds()).toEqual([legacyIssue.id]);
   });
 
   it('rejects confirmations for resolved issues without changing their count', async () => {
