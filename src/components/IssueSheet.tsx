@@ -3,8 +3,10 @@ import type { Issue } from '../types';
 interface IssueSheetProps {
   issue: Issue | null;
   confirmed: boolean;
+  followed: boolean;
   onClose: () => void;
   onConfirm: (id: string) => void;
+  onToggleFollow: (id: string) => void;
 }
 
 function stageFor(issue: Issue): number {
@@ -14,7 +16,7 @@ function stageFor(issue: Issue): number {
   return 0;
 }
 
-export function IssueSheet({ issue, confirmed, onClose, onConfirm }: IssueSheetProps) {
+export function IssueSheet({ issue, confirmed, followed, onClose, onConfirm, onToggleFollow }: IssueSheetProps) {
   if (!issue) return null;
 
   const stage = stageFor(issue);
@@ -54,13 +56,22 @@ export function IssueSheet({ issue, confirmed, onClose, onConfirm }: IssueSheetP
           <span className={`progress-dot ${stage >= 3 ? 'done' : ''}`} />
         </div>
         <div className="progress-labels"><span>Bildirildi</span><span>Doğrulandı</span><span>İşlemde</span><span>Çözüldü</span></div>
-        <button
-          className="primary-btn"
-          disabled={confirmed || issue.status === 'Çözüldü'}
-          onClick={() => onConfirm(issue.id)}
-        >
-          {issue.status === 'Çözüldü' ? 'Sorun çözüldü' : confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
-        </button>
+        <div className="issue-actions">
+          <button
+            className={`secondary-btn follow-btn ${followed ? 'active' : ''}`}
+            onClick={() => onToggleFollow(issue.id)}
+            aria-pressed={followed}
+          >
+            {followed ? '♥ Takip ediliyor' : '♡ Takip et'}
+          </button>
+          <button
+            className="primary-btn"
+            disabled={confirmed || issue.status === 'Çözüldü'}
+            onClick={() => onConfirm(issue.id)}
+          >
+            {issue.status === 'Çözüldü' ? 'Sorun çözüldü' : confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
+          </button>
+        </div>
       </div>
     </section>
   );
