@@ -24,6 +24,7 @@ export default function App() {
   const [focus, setFocus] = useState<(Point & { key: number }) | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [dataReady, setDataReady] = useState(false);
+  const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [toast, setToast] = useState('');
 
   const selectedIssue = useMemo(
@@ -45,6 +46,7 @@ export default function App() {
       setConfirmedIssueIds(confirmedIds);
     }).catch(() => {
       if (cancelled) return;
+      setPersistenceAvailable(false);
       setIssues(initialIssues);
       notify('Yerel veri deposu açılamadı; bu oturum geçici modda çalışıyor.');
     }).finally(() => {
@@ -91,6 +93,21 @@ export default function App() {
   const confirmIssue = async (id: string) => {
     if (confirmedIssueIds.includes(id)) {
       notify('Bu sorunu zaten doğruladın.');
+      return;
+    }
+
+    if (!persistenceAvailable) {
+      setIssues((current) => current.map((issue) => {
+        if (issue.id !== id) return issue;
+        const confirms = issue.confirms + 1;
+        return {
+          ...issue,
+          confirms,
+          status: issue.status === 'Yeni' && confirms >= 2 ? 'Doğrulandı' : issue.status,
+        };
+      }));
+      setConfirmedIssueIds((current) => [...current, id]);
+      notify('Doğrulama bu oturum için kaydedildi.');
       return;
     }
 
@@ -145,6 +162,16 @@ export default function App() {
       createdAt: now,
       updatedAt: now,
     };
+
+    if (!persistenceAvailable) {
+      setIssues((current) => [issue, ...current]);
+      setConfirmedIssueIds((current) => [...current, issue.id]);
+      setReportOpen(false);
+      setSelectedIssueId(issue.id);
+      setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
+      notify('Bildirim yalnızca bu oturum için eklendi.');
+      return;
+    }
 
     try {
       const stored = await repository.createIssue(issue);
