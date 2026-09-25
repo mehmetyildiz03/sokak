@@ -216,7 +216,7 @@ button:disabled { cursor: default; }
 }
 
 .nearby-filter button {
-  min-height: 36px;
+  min-height: 44px;
   border: 0;
   border-radius: 10px;
   padding: 7px 10px;
