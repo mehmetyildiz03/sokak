@@ -227,6 +227,13 @@ export function ReportFlow({ open, center, issues, onClose, onSubmit, onOpenIssu
                 <div className="review-emoji">{draft.emoji}</div>
                 <div><span className="eyebrow">Yeni bildirim</span><h3>{draft.categoryLabel || 'Kategori seçilmedi'}</h3><p>{draft.description || 'Açıklama eklenmedi.'}</p></div>
               </div>
+              <div className="review-location">
+                <span aria-hidden="true">⌖</span>
+                <div>
+                  <strong>Bildirim konumu</strong>
+                  <small>{draft.lat.toFixed(5)}, {draft.lng.toFixed(5)}</small>
+                </div>
+              </div>
               {draft.photoUrl && <div className="photo-preview review-photo" style={{ backgroundImage: `url(${draft.photoUrl})` }} />}
               {similarIssue && (
                 <div className="similar-warning">
