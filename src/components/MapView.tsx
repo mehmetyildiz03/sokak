@@ -13,10 +13,11 @@ interface MapViewProps {
 
 function applyMapMode(map: MapLibreMap, mode: MapMode) {
   if (!map.getLayer('issue-heat')) return;
-  const heat = mode === 'heat';
-  map.setLayoutProperty('issue-heat', 'visibility', heat ? 'visible' : 'none');
-  map.setLayoutProperty('issue-halo', 'visibility', heat ? 'none' : 'visible');
-  map.setLayoutProperty('issue-points', 'visibility', heat ? 'none' : 'visible');
+  const heatAtAreaLevel = mode === 'heat' && map.getZoom() < 16.5;
+  const showPoints = mode === 'issues' || (mode === 'heat' && !heatAtAreaLevel);
+  map.setLayoutProperty('issue-heat', 'visibility', heatAtAreaLevel ? 'visible' : 'none');
+  map.setLayoutProperty('issue-halo', 'visibility', showPoints ? 'visible' : 'none');
+  map.setLayoutProperty('issue-points', 'visibility', showPoints ? 'visible' : 'none');
 }
 
 function makeGeoJson(issues: Issue[]) {
@@ -31,7 +32,7 @@ function makeGeoJson(issues: Issue[]) {
         severity: issue.severity,
         confirms: issue.confirms,
         category: issue.category,
-        heatWeight: Math.min(
+        heatWeight: issue.status === 'Çözüldü' ? 0 : Math.min(
           1,
           (issue.severity / 3) * 0.55 +
           Math.min(0.3, Math.log2(issue.confirms + 1) / 16) +
@@ -52,8 +53,6 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
 
   useEffect(() => { selectRef.current = onSelectIssue; }, [onSelectIssue]);
   useEffect(() => { centerRef.current = onCenterChange; }, [onCenterChange]);
-  useEffect(() => { issuesRef.current = issues; }, [issues]);
-  useEffect(() => { modeRef.current = mode; }, [mode]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -86,7 +85,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
         id: 'issue-heat',
         type: 'heatmap',
         source: 'issues',
-        maxzoom: 17,
+        maxzoom: 22,
         layout: { visibility: 'none' },
         paint: {
           'heatmap-weight': ['get', 'heatWeight'],
@@ -133,6 +132,7 @@ export function MapView({ issues, mode, focus, onSelectIssue, onCenterChange }: 
       const center = map.getCenter();
       centerRef.current({ lng: center.lng, lat: center.lat });
     });
+    map.on('zoomend', () => applyMapMode(map, modeRef.current));
 
     mapRef.current = map;
     return () => {
