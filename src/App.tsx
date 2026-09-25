@@ -224,7 +224,7 @@ export default function App() {
       categoryLabel: draft.categoryLabel,
       emoji: draft.emoji,
       title: draft.description.length > 44 ? `${draft.description.slice(0, 44)}…` : draft.description,
-      place: 'Yeni bildirilen konum',
+      place: draft.place || `${draft.lat.toFixed(5)}, ${draft.lng.toFixed(5)}`,
       description: draft.description,
       confirms: 1,
       comments: 0,
