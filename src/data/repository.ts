@@ -1,4 +1,9 @@
-import type { Issue } from '../types';
+import type {
+  Issue,
+  IssueComment,
+  IssueCommunitySnapshot,
+  ResolutionFeedbackValue,
+} from '../types';
 
 export interface ConfirmationResult {
   issue: Issue;
@@ -12,6 +17,9 @@ export interface IssueRepository {
   createIssue(issue: Issue): Promise<Issue>;
   confirmIssue(issueId: string): Promise<ConfirmationResult>;
   setIssueFollowed(issueId: string, followed: boolean): Promise<void>;
+  getCommunitySnapshot(issueId: string): Promise<IssueCommunitySnapshot>;
+  addComment(issueId: string, body: string): Promise<IssueComment>;
+  setResolutionFeedback(issueId: string, feedback: ResolutionFeedbackValue): Promise<IssueCommunitySnapshot>;
 }
 
 export class IssueRepositoryError extends Error {
