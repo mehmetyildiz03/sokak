@@ -1,4 +1,4 @@
--- Sokak v0.3 future PostgreSQL schema.
+-- Sokak v0.5 future PostgreSQL schema.
 -- Şu anda deploy edilmez.
 
 create table if not exists issues (
@@ -48,12 +48,25 @@ create table if not exists comments (
   id text primary key,
   issue_id text not null references issues(id) on delete cascade,
   client_id text not null,
-  body text not null check (char_length(body) between 1 and 1000),
+  author_label text not null,
+  body text not null check (char_length(body) between 2 and 1000),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists comments_issue_created_idx on comments(issue_id, created_at);
+
+create table if not exists resolution_feedback (
+  issue_id text not null references issues(id) on delete cascade,
+  client_id text not null,
+  value text not null check (value in ('resolved','still_open')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (issue_id, client_id)
+);
+
+create index if not exists resolution_feedback_issue_idx
+  on resolution_feedback(issue_id);
 
 create table if not exists status_history (
   id text primary key,
