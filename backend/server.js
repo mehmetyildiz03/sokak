@@ -11,7 +11,7 @@ import {
   validateIssueInput,
   validateResolutionFeedback,
 } from './core.js';
-import { decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
+import { checkStorage, decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
 
 const { Pool } = pg;
 
@@ -561,6 +561,12 @@ async function route(req, res) {
 
   if (req.method === 'GET' && path === '/health') {
     await pool.query('select 1');
+    sendJson(res, 200, { ok: true }, origin);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/health/storage') {
+    await checkStorage();
     sendJson(res, 200, { ok: true }, origin);
     return;
   }
