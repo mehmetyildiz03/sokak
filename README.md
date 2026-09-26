@@ -2,9 +2,9 @@
 
 Mahalle ve sokak ölçeğindeki kamusal sorunları harita üzerinde görünür, doğrulanabilir ve takip edilebilir hale getirmeyi amaçlayan civic-tech uygulaması.
 
-## v0.4
+## v0.5
 
-v0.4, v0.3 veri/persistence temelini koruyup haritayı daha ölçeklenebilir bir şehir sorun görünümüne taşır. Railway veya başka bir sunucu çalıştırmadan IndexedDB kullanmaya devam eder; ileride aynı repository arayüzü REST API'ye bağlanabilir.
+v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katmanı ekler. Railway veya başka bir sunucu çalıştırmadan IndexedDB kullanmaya devam eder; ileride aynı repository arayüzü REST API'ye bağlanabilir.
 
 ### Şu anda çalışanlar
 - MapLibre tabanlı harita
@@ -13,6 +13,9 @@ v0.4, v0.3 veri/persistence temelini koruyup haritayı daha ölçeklenebilir bir
 - Seçili sorun için filtrelerden bağımsız vurgulu marker; takip edilen tekil sorun ve cluster'larda ayrı vurgu
 - Gerçek **Yakınımda** görünümü: cihaz konumu veya harita merkezine göre mesafe sıralaması, Açık/Tümü filtresi ve haritadaki soruna geri dönüş
 - Gerçek **Takip** görünümü: sorun detayından takip et/takibi bırak, cihazda kalıcı takip listesi, açık/çözülmüş özeti ve haritadaki soruna geri dönüş
+- **Topluluk katılımı**: sorun detayında mahalle güncellemesi/yorum bırakma, kalıcı yorum geçmişi ve anonim yerel komşu etiketi
+- **Çözüm doğrulaması**: çözülmüş kayıtlarda “Düzeldi / Devam ediyor” geri bildirimi; kişi başına tek kayıt, tercih değiştirilebilir ve toplam şişmez
+- Topluluk çözüm sinyali kurumsal durumu otomatik değiştirmez; gerçek kurum hesabı/entegrasyonu ayrı tutulur
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
 - Sorun detay bottom-sheet'i
 - İdempotent “Ben de gördüm” doğrulaması
@@ -125,3 +128,10 @@ npm run preview
 - Harita tabanı prototipte doğrudan OpenStreetMap raster tile sunucusunu kullanır; gerçek trafik öncesi production tile altyapısı seçilmelidir.
 - Ters geocoding prototipte public Nominatim kullanır. Kullanım politikası gereği ağır trafik için uygun değildir; gerçek ölçek öncesi kendi/profesyonel geocoder altyapısına geçilmelidir.
 - Manifest mevcut olsa da production offline/PWA katmanı henüz tamamlanmış değildir.
+
+
+## Topluluk katılımı ve ortak backend
+
+v0.5'te yorum ve çözüm doğrulama deneyimi repository katmanına kadar tamamlanmıştır. IndexedDB modunda bu kayıtlar aynı tarayıcı/cihaz içinde kalıcıdır. Bu, UI ve domain davranışını gerçek veritabanına geçmeden test etmemizi sağlar ancak **farklı kullanıcıların birbirinin yorumunu görmesi anlamına gelmez**.
+
+Gerçek çok-kullanıcılı katılım için `VITE_API_BASE_URL` ile ortak REST backend devreye alınmalıdır. Gerekli API sözleşmesi ve PostgreSQL şeması `backend/` altında hazırdır. Ortak backend açıldığında mevcut React bileşenlerinin yeniden yazılması gerekmez.
