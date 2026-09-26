@@ -139,7 +139,7 @@ describe('IndexedDbIssueRepository persistence', () => {
     expect(await afterUnfollow.getFollowedIssueIds()).not.toContain(issue.id);
   });
 
-  it('upgrades a v1 database to v2 without losing existing issue data', async () => {
+  it('upgrades a v1 database to v3 without losing existing issue data', async () => {
     const name = dbName('migration');
     const legacyIssue = makeIssue({ id: 'iss-legacy', title: 'v1 kaydı' });
     await createLegacyV1Database(name, legacyIssue);
@@ -152,6 +152,72 @@ describe('IndexedDbIssueRepository persistence', () => {
 
     await upgraded.setIssueFollowed(legacyIssue.id, true);
     expect(await upgraded.getFollowedIssueIds()).toEqual([legacyIssue.id]);
+  });
+
+  it('persists comments and keeps the issue comment count consistent', async () => {
+    const name = dbName('comments');
+    const author = new IndexedDbIssueRepository('client-author', name);
+    const issue = makeIssue({ id: 'iss-commented' });
+    await author.createIssue(issue);
+
+    const commenter = new IndexedDbIssueRepository('client-commenter', name);
+    const comment = await commenter.addComment(issue.id, 'Bu çukur bugün biraz daha büyümüş.');
+
+    expect(comment.issueId).toBe(issue.id);
+    expect(comment.body).toBe('Bu çukur bugün biraz daha büyümüş.');
+    expect(comment.authorLabel).toMatch(/^Komşu /);
+
+    const reopened = new IndexedDbIssueRepository('client-commenter', name);
+    const snapshot = await reopened.getCommunitySnapshot(issue.id);
+    expect(snapshot.comments).toHaveLength(1);
+    expect(snapshot.comments[0]?.body).toContain('biraz daha büyümüş');
+
+    const storedIssue = (await reopened.listIssues()).find((item) => item.id === issue.id);
+    expect(storedIssue?.comments).toBe(1);
+  });
+
+  it('keeps one resolution feedback per client and lets the client change it', async () => {
+    const name = dbName('resolution-feedback');
+    const author = new IndexedDbIssueRepository('client-author', name);
+    const issue = makeIssue({
+      id: 'iss-community-resolved',
+      status: 'Çözüldü',
+    });
+    await author.createIssue(issue);
+
+    const firstCitizen = new IndexedDbIssueRepository('client-one', name);
+    const secondCitizen = new IndexedDbIssueRepository('client-two', name);
+
+    let snapshot = await firstCitizen.setResolutionFeedback(issue.id, 'resolved');
+    expect(snapshot.resolution.resolvedCount).toBe(1);
+    expect(snapshot.resolution.stillOpenCount).toBe(0);
+    expect(snapshot.resolution.myFeedback).toBe('resolved');
+
+    snapshot = await secondCitizen.setResolutionFeedback(issue.id, 'still_open');
+    expect(snapshot.resolution.resolvedCount).toBe(1);
+    expect(snapshot.resolution.stillOpenCount).toBe(1);
+
+    snapshot = await firstCitizen.setResolutionFeedback(issue.id, 'still_open');
+    expect(snapshot.resolution.resolvedCount).toBe(0);
+    expect(snapshot.resolution.stillOpenCount).toBe(2);
+    expect(snapshot.resolution.myFeedback).toBe('still_open');
+
+    const reopened = new IndexedDbIssueRepository('client-one', name);
+    const persisted = await reopened.getCommunitySnapshot(issue.id);
+    expect(persisted.resolution.resolvedCount).toBe(0);
+    expect(persisted.resolution.stillOpenCount).toBe(2);
+    expect(persisted.resolution.myFeedback).toBe('still_open');
+  });
+
+  it('rejects resolution feedback for unresolved issues', async () => {
+    const name = dbName('resolution-feedback-open');
+    const author = new IndexedDbIssueRepository('client-author', name);
+    const issue = makeIssue({ id: 'iss-not-resolved', status: 'Doğrulandı' });
+    await author.createIssue(issue);
+
+    await expect(
+      author.setResolutionFeedback(issue.id, 'resolved'),
+    ).rejects.toThrow('yalnız çözülmüş kayıtlarda');
   });
 
   it('rejects confirmations for resolved issues without changing their count', async () => {
