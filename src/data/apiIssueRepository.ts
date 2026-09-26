@@ -1,5 +1,10 @@
 import { IssueRepositoryError, type ConfirmationResult, type IssueRepository } from './repository';
-import type { Issue } from '../types';
+import type {
+  Issue,
+  IssueComment,
+  IssueCommunitySnapshot,
+  ResolutionFeedbackValue,
+} from '../types';
 
 interface IssueIdListResponse {
   issueIds: string[];
@@ -66,5 +71,34 @@ export class ApiIssueRepository implements IssueRepository {
     await this.request<{ followed: boolean }>(`/v1/issues/${encodeURIComponent(issueId)}/follow`, {
       method: followed ? 'PUT' : 'DELETE',
     });
+  }
+
+  getCommunitySnapshot(issueId: string): Promise<IssueCommunitySnapshot> {
+    return this.request<IssueCommunitySnapshot>(
+      `/v1/issues/${encodeURIComponent(issueId)}/community`,
+    );
+  }
+
+  addComment(issueId: string, body: string): Promise<IssueComment> {
+    return this.request<IssueComment>(
+      `/v1/issues/${encodeURIComponent(issueId)}/comments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      },
+    );
+  }
+
+  setResolutionFeedback(
+    issueId: string,
+    feedback: ResolutionFeedbackValue,
+  ): Promise<IssueCommunitySnapshot> {
+    return this.request<IssueCommunitySnapshot>(
+      `/v1/issues/${encodeURIComponent(issueId)}/resolution-feedback`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ feedback }),
+      },
+    );
   }
 }
