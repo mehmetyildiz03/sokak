@@ -55,6 +55,7 @@ export function MapFilterPanel({
         <strong>{visibleCount}</strong>
         <span>/ {totalCount} kayıt gösteriliyor</span>
       </div>
+      <p className="filter-helper">Kategori veya durumda seçim yoksa o grubun tüm kayıtları gösterilir.</p>
 
       <fieldset className="filter-group">
         <legend>Kategori</legend>
