@@ -51,6 +51,8 @@ export default function App() {
   const [focus, setFocus] = useState<(Point & { key: number }) | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [dataReady, setDataReady] = useState(false);
+  const [dataLoadFailed, setDataLoadFailed] = useState(false);
+  const [dataReloadKey, setDataReloadKey] = useState(0);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [toast, setToast] = useState('');
   const [communityByIssueId, setCommunityByIssueId] = useState<Record<string, IssueCommunitySnapshot>>({});
@@ -75,6 +77,9 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    setDataReady(false);
+    setDataLoadFailed(false);
+    setPersistenceAvailable(true);
 
     void Promise.all([
       repository.listIssues(),
@@ -88,10 +93,17 @@ export default function App() {
     }).catch(() => {
       if (cancelled) return;
       setPersistenceAvailable(false);
-      setIssues(initialIssues);
-      notify(sharedBackendEnabled
-        ? 'Ortak sunucuya ulaşılamadı; bu oturum geçici modda çalışıyor.'
-        : 'Yerel veri deposu açılamadı; bu oturum geçici modda çalışıyor.');
+
+      if (sharedBackendEnabled) {
+        setIssues([]);
+        setConfirmedIssueIds([]);
+        setFollowedIssueIds([]);
+        setDataLoadFailed(true);
+        notify('Ortak şehir verilerine ulaşılamadı.');
+      } else {
+        setIssues(initialIssues);
+        notify('Yerel veri deposu açılamadı; bu oturum geçici modda çalışıyor.');
+      }
     }).finally(() => {
       if (!cancelled) setDataReady(true);
     });
@@ -99,7 +111,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [repository]);
+  }, [repository, dataReloadKey]);
 
   useEffect(() => {
     if (!toast) return;
@@ -553,7 +565,21 @@ export default function App() {
           </div>
         )}
 
-        {activeView === 'map' && dataReady && issues.length === 0 && (
+        {activeView === 'map' && dataReady && dataLoadFailed && (
+          <div className="map-empty-state map-error-state glass" role="alert">
+            <span className="map-empty-icon" aria-hidden="true">!</span>
+            <strong>Canlı verilere ulaşılamıyor</strong>
+            <p>Bağlantıyı kontrol edip ortak şehir verilerini yeniden yükleyebilirsin.</p>
+            <button
+              type="button"
+              onClick={() => setDataReloadKey((key) => key + 1)}
+            >
+              Yeniden dene
+            </button>
+          </div>
+        )}
+
+        {activeView === 'map' && dataReady && !dataLoadFailed && issues.length === 0 && (
           <div className="map-empty-state glass" role="status">
             <span className="map-empty-icon" aria-hidden="true">⌖</span>
             <strong>Henüz bu bölgede bildirim yok</strong>
@@ -571,7 +597,7 @@ export default function App() {
           </div>
         )}
 
-        {activeView === 'map' && dataReady && issues.length > 0 && visibleMapIssues.length === 0 && (
+        {activeView === 'map' && dataReady && !dataLoadFailed && issues.length > 0 && visibleMapIssues.length === 0 && (
           <div className="map-filter-empty glass">
             <strong>Bu filtrelerle eşleşen kayıt yok</strong>
             <button type="button" onClick={() => setMapFilters(emptyMapFilters)}>Tüm kayıtları göster</button>
