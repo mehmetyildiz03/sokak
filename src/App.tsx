@@ -553,9 +553,27 @@ export default function App() {
           </div>
         )}
 
-        {activeView === 'map' && visibleMapIssues.length === 0 && dataReady && (
+        {activeView === 'map' && dataReady && issues.length === 0 && (
+          <div className="map-empty-state glass" role="status">
+            <span className="map-empty-icon" aria-hidden="true">⌖</span>
+            <strong>Henüz bu bölgede bildirim yok</strong>
+            <p>Şehir haritasındaki ilk gerçek sorunu sen bildirebilirsin.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedIssueId(null);
+                setFilterPanelOpen(false);
+                setReportOpen(true);
+              }}
+            >
+              İlk sorunu bildir
+            </button>
+          </div>
+        )}
+
+        {activeView === 'map' && dataReady && issues.length > 0 && visibleMapIssues.length === 0 && (
           <div className="map-filter-empty glass">
-            <strong>Bu filtrelerle kayıt yok</strong>
+            <strong>Bu filtrelerle eşleşen kayıt yok</strong>
             <button type="button" onClick={() => setMapFilters(emptyMapFilters)}>Tüm kayıtları göster</button>
           </div>
         )}
