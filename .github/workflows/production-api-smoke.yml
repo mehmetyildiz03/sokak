@@ -22,6 +22,12 @@ jobs:
           body="$(curl --fail --silent --show-error --retry 4 --retry-delay 2 https://sokak-api-production.up.railway.app/health)"
           echo "$body" | grep -q '"ok":true'
 
+      - name: Storage readiness
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --retry 4 --retry-delay 2 https://sokak-api-production.up.railway.app/health/storage)"
+          echo "$body" | grep -q '"ok":true'
+
       - name: Shared issues endpoint and CORS
         run: |
           set -euo pipefail
