@@ -1017,3 +1017,10 @@ button:disabled { cursor: default; }
     grid-template-columns: 1fr;
   }
 }
+
+.filter-helper {
+  margin: -5px 1px 13px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
