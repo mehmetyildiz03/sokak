@@ -1,13 +1,20 @@
 import { initialIssues } from './issues';
 import { formatIssueAge } from './time';
 import { IssueRepositoryError, type ConfirmationResult, type IssueRepository } from './repository';
-import type { Issue } from '../types';
+import type {
+  Issue,
+  IssueComment,
+  IssueCommunitySnapshot,
+  ResolutionFeedbackValue,
+} from '../types';
 
 const DB_NAME = 'sokak';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const ISSUE_STORE = 'issues';
 const CONFIRMATION_STORE = 'confirmations';
 const FOLLOW_STORE = 'follows';
+const COMMENT_STORE = 'comments';
+const RESOLUTION_FEEDBACK_STORE = 'resolutionFeedback';
 const META_STORE = 'meta';
 const SEED_KEY = 'seed:v1';
 
@@ -23,6 +30,15 @@ interface StoredFollow {
   issueId: string;
   clientId: string;
   createdAt: string;
+}
+
+interface StoredResolutionFeedback {
+  key: string;
+  issueId: string;
+  clientId: string;
+  value: ResolutionFeedbackValue;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface MetaRecord {
@@ -66,6 +82,17 @@ function openDatabase(dbName: string): Promise<IDBDatabase> {
         const store = db.createObjectStore(FOLLOW_STORE, { keyPath: 'key' });
         store.createIndex('by-client', 'clientId', { unique: false });
         store.createIndex('by-issue', 'issueId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains(COMMENT_STORE)) {
+        const store = db.createObjectStore(COMMENT_STORE, { keyPath: 'id' });
+        store.createIndex('by-issue', 'issueId', { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains(RESOLUTION_FEEDBACK_STORE)) {
+        const store = db.createObjectStore(RESOLUTION_FEEDBACK_STORE, { keyPath: 'key' });
+        store.createIndex('by-issue', 'issueId', { unique: false });
+        store.createIndex('by-client', 'clientId', { unique: false });
       }
 
       if (!db.objectStoreNames.contains(META_STORE)) {
@@ -222,6 +249,127 @@ export class IndexedDbIssueRepository implements IssueRepository {
 
     await done;
     return { issue: normalizeIssue(updated), alreadyConfirmed: false };
+  }
+
+  private authorLabel(): string {
+    let hash = 0;
+    for (let index = 0; index < this.clientId.length; index += 1) {
+      hash = ((hash << 5) - hash + this.clientId.charCodeAt(index)) | 0;
+    }
+    return `Komşu ${Math.abs(hash).toString(36).slice(0, 4).toUpperCase().padStart(4, '0')}`;
+  }
+
+  async getCommunitySnapshot(issueId: string): Promise<IssueCommunitySnapshot> {
+    await this.ensureSeeded();
+    const db = await this.dbPromise;
+    const tx = db.transaction([COMMENT_STORE, RESOLUTION_FEEDBACK_STORE], 'readonly');
+    const done = transactionDone(tx);
+
+    const commentsIndex = tx.objectStore(COMMENT_STORE).index('by-issue');
+    const feedbackIndex = tx.objectStore(RESOLUTION_FEEDBACK_STORE).index('by-issue');
+
+    const [comments, feedback] = await Promise.all([
+      requestToPromise(commentsIndex.getAll(issueId) as IDBRequest<IssueComment[]>),
+      requestToPromise(feedbackIndex.getAll(issueId) as IDBRequest<StoredResolutionFeedback[]>),
+    ]);
+    await done;
+
+    comments.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    return {
+      comments,
+      resolution: {
+        resolvedCount: feedback.filter((item) => item.value === 'resolved').length,
+        stillOpenCount: feedback.filter((item) => item.value === 'still_open').length,
+        myFeedback: feedback.find((item) => item.clientId === this.clientId)?.value ?? null,
+      },
+    };
+  }
+
+  async addComment(issueId: string, body: string): Promise<IssueComment> {
+    await this.ensureSeeded();
+    const trimmed = body.trim();
+    if (trimmed.length < 2 || trimmed.length > 1000) {
+      throw new IssueRepositoryError('Yorum 2 ile 1000 karakter arasında olmalı.');
+    }
+
+    const db = await this.dbPromise;
+    const tx = db.transaction([ISSUE_STORE, COMMENT_STORE], 'readwrite');
+    const done = transactionDone(tx);
+    const issueStore = tx.objectStore(ISSUE_STORE);
+    const commentStore = tx.objectStore(COMMENT_STORE);
+    const issue = await requestToPromise(issueStore.get(issueId) as IDBRequest<Issue | undefined>);
+
+    if (!issue) {
+      await done;
+      throw new IssueRepositoryError('Sorun kaydı bulunamadı.');
+    }
+
+    const now = new Date().toISOString();
+    const id = typeof crypto.randomUUID === 'function'
+      ? `cmt-${crypto.randomUUID()}`
+      : `cmt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const comment: IssueComment = {
+      id,
+      issueId,
+      authorLabel: this.authorLabel(),
+      body: trimmed,
+      createdAt: now,
+    };
+
+    commentStore.put(comment);
+    issueStore.put({
+      ...issue,
+      comments: issue.comments + 1,
+      updatedAt: now,
+    } satisfies Issue);
+
+    await done;
+    return comment;
+  }
+
+  async setResolutionFeedback(
+    issueId: string,
+    feedback: ResolutionFeedbackValue,
+  ): Promise<IssueCommunitySnapshot> {
+    await this.ensureSeeded();
+    const db = await this.dbPromise;
+
+    const issueTx = db.transaction(ISSUE_STORE, 'readonly');
+    const issueDone = transactionDone(issueTx);
+    const issue = await requestToPromise(
+      issueTx.objectStore(ISSUE_STORE).get(issueId) as IDBRequest<Issue | undefined>,
+    );
+    await issueDone;
+
+    if (!issue) {
+      throw new IssueRepositoryError('Sorun kaydı bulunamadı.');
+    }
+    if (issue.status !== 'Çözüldü') {
+      throw new IssueRepositoryError('Çözüm geri bildirimi yalnız çözülmüş kayıtlarda kullanılabilir.');
+    }
+
+    const tx = db.transaction(RESOLUTION_FEEDBACK_STORE, 'readwrite');
+    const done = transactionDone(tx);
+    const store = tx.objectStore(RESOLUTION_FEEDBACK_STORE);
+    const key = `${this.clientId}:${issueId}`;
+    const existing = await requestToPromise(
+      store.get(key) as IDBRequest<StoredResolutionFeedback | undefined>,
+    );
+    const now = new Date().toISOString();
+
+    store.put({
+      key,
+      issueId,
+      clientId: this.clientId,
+      value: feedback,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    } satisfies StoredResolutionFeedback);
+
+    await done;
+    return this.getCommunitySnapshot(issueId);
   }
 
   async setIssueFollowed(issueId: string, followed: boolean): Promise<void> {
