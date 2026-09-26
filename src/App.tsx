@@ -515,7 +515,7 @@ export default function App() {
           </button>
         </header>
 
-        {activeView === 'map' && <div className="mode-switch glass" role="group" aria-label="Harita görünümü">
+        {activeView === 'map' && issues.length > 0 && <div className="mode-switch glass" role="group" aria-label="Harita görünümü">
           <button
             className={`mode-btn ${mode === 'issues' ? 'active' : ''}`}
             onClick={() => setMode('issues')}
@@ -532,7 +532,7 @@ export default function App() {
           </button>
         </div>}
 
-        {activeView === 'map' && (
+        {activeView === 'map' && issues.length > 0 && (
           <button
             type="button"
             className={`map-filter-trigger glass ${activeMapFilterCount > 0 ? 'active' : ''}`}
@@ -546,7 +546,7 @@ export default function App() {
           </button>
         )}
 
-        {activeView === 'map' && (
+        {activeView === 'map' && issues.length > 0 && (
           <MapFilterPanel
             open={filterPanelOpen}
             filters={mapFilters}
@@ -558,7 +558,7 @@ export default function App() {
           />
         )}
 
-        {activeView === 'map' && activeMapFilterCount > 0 && !filterPanelOpen && (
+        {activeView === 'map' && issues.length > 0 && activeMapFilterCount > 0 && !filterPanelOpen && (
           <div className="filter-summary glass" role="status">
             <span>{visibleMapIssues.length} / {issues.length} kayıt</span>
             <button type="button" onClick={() => setMapFilters(emptyMapFilters)}>Temizle</button>
@@ -604,7 +604,7 @@ export default function App() {
           </div>
         )}
 
-        {activeView === 'map' && (mode === 'issues' ? (
+        {activeView === 'map' && issues.length > 0 && (mode === 'issues' ? (
           <aside className="map-legend glass" aria-label="Sorun durumları">
             <span><i className="dot dot-new" /> Yeni</span>
             <span><i className="dot dot-confirmed" /> Doğrulandı</span>
