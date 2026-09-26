@@ -1,0 +1,46 @@
+name: Production API Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.env.production'
+      - '.github/workflows/production-api-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --retry 4 --retry-delay 2 https://sokak-api-production.up.railway.app/health)"
+          echo "$body" | grep -q '"ok":true'
+
+      - name: Shared issues endpoint and CORS
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          curl --fail --silent --show-error             -D "$headers" -o "$body"             -H 'Origin: https://mehmetyildiz03.github.io'             https://sokak-api-production.up.railway.app/v1/issues
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          node -e "const fs=require('fs'); const data=JSON.parse(fs.readFileSync(process.argv[1],'utf8')); if(!Array.isArray(data)) process.exit(1)" "$body"
+
+      - name: Client-scoped read endpoint
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'X-Sokak-Client-Id: production-smoke-reader'             https://sokak-api-production.up.railway.app/v1/me/follows)"
+          echo "$body" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s); if(!Array.isArray(x.issueIds)) process.exit(1)})"
+
+      - name: Upload preflight
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl --fail --silent --show-error             -X OPTIONS -D "$headers" -o /dev/null             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Access-Control-Request-Method: POST'             -H 'Access-Control-Request-Headers: content-type,x-sokak-client-id'             https://sokak-api-production.up.railway.app/v1/uploads/photo
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          grep -qi '^access-control-allow-methods: .*POST' "$headers"
