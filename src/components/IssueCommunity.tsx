@@ -87,7 +87,7 @@ export function IssueCommunity({
           <span className="eyebrow">Mahalle katılımı</span>
           <h3 id="communityTitle">Topluluk</h3>
         </div>
-        <span className="community-count">{issue.comments} yorum</span>
+        <span className="community-count">{comments.length} yerel güncelleme</span>
       </div>
 
       <div className="comment-composer">
