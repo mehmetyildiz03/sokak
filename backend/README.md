@@ -1,7 +1,32 @@
 # Sokak backend contract
 
-Bu klasör v0.5'te backend sözleşmesini ve gelecekteki PostgreSQL şemasını tanımlar.
-Şu anda Railway veya başka bir sunucu deploy edilmez.
+Bu klasör v0.5'te backend sözleşmesini, PostgreSQL şemasını ve çalışır Node.js REST sunucusunu içerir.
+Sunucu kodu ve PostgreSQL smoke testi CI'da doğrulanır; şu anda Railway veya başka bir kalıcı sunucu deploy edilmez.
+
+
+## Çalışır API sunucusu
+
+- Giriş noktası: `backend/server.js`
+- PostgreSQL sürücüsü: `pg`
+- Sağlık kontrolü: `GET /health`
+- Şema: başlangıçta `backend/schema.sql` uygulanabilir (`RUN_MIGRATIONS=false` ile kapatılabilir).
+- CORS allowlist: `ALLOWED_ORIGINS`
+- Yazma işlemlerinde `X-Sokak-Client-Id` zorunludur.
+- Process-içi temel write/comment rate limit vardır. Bu, gerçek hesap/edge rate limiting yerine geçmez.
+
+Yerel çalıştırma:
+
+```bash
+cd backend
+npm ci
+DATABASE_URL=postgresql://... \
+ALLOWED_ORIGINS=http://localhost:5173 \
+npm start
+```
+
+CI, geçici PostgreSQL üzerinde iki farklı istemciyle şu akışı uçtan uca doğrular:
+
+`bildirim → ikinci kullanıcı doğrulaması → takip → yorum → community snapshot → çözüm geri bildirimi`
 
 ## Frontend adapter seçimi
 
@@ -178,3 +203,12 @@ v0.5 yerel aşamada anonim `clientId` kullanılır. Gerçek hesap sistemi geldi�
 
 Frontend şu anda IndexedDB'de data URL saklar. Production backend'de fotoğraf binary verisi issue tablosuna gömülmemelidir.
 Object storage'a yüklenip yalnızca URL / object key veritabanında tutulmalıdır.
+
+
+## Production öncesi zorunlu kalanlar
+
+1. Anonim client ID yerine gerçek hesap/oturum doğrulaması.
+2. Fotoğraf için object storage + yükleme endpoint'i; API data-URL fotoğraf kabul etmez.
+3. Dağıtık rate limiting / abuse prevention; mevcut limiter tek process içindir.
+4. Moderasyon, yorum şikâyeti ve kullanıcı engelleme akışları.
+5. Kurum hesabı için ayrı yetki modeli; vatandaş endpoint'leri kurumsal statü değiştiremez.
