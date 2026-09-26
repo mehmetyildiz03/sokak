@@ -4,7 +4,7 @@ Mahalle ve sokak ölçeğindeki kamusal sorunları harita üzerinde görünür, 
 
 ## v0.5
 
-v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katmanı ekler. Railway veya başka bir sunucu çalıştırmadan IndexedDB kullanmaya devam eder; ileride aynı repository arayüzü REST API'ye bağlanabilir.
+v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katmanı ekler. Canlı GitHub Pages sürümü artık Railway üzerindeki ortak REST API + PostgreSQL altyapısını kullanır; IndexedDB adapter'ı yerel geliştirme ve fallback için korunur.
 
 ### Şu anda çalışanlar
 - MapLibre tabanlı harita
@@ -25,12 +25,12 @@ v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katman
 - Tarayıcı konum izni
 - Yakındaki aynı kategoride açık sorun için mükerrer bildirim uyarısı
 - Fotoğraflı yeni bildirim
-- **IndexedDB ile kalıcı sorun, fotoğraf, doğrulama ve takip kayıtları**
-- Sayfa yenilendiğinde yerel kayıtların yeniden yüklenmesi
-- IndexedDB kullanılamazsa açıkça belirtilen geçici oturum modu
+- Canlı ortamda **ortak PostgreSQL ile sorun, doğrulama, takip, yorum ve çözüm geri bildirimi**
+- Fotoğrafların Railway S3-uyumlu object storage bucket'ına yüklenmesi ve API üzerinden sunulması
+- Yerel geliştirmede IndexedDB kalıcılığı ve sunucuya ulaşılamazsa açıkça belirtilen geçici oturum fallback'i
 - Backend bağımsız `IssueRepository` sözleşmesi
-- Hazır REST adapter'ı: `VITE_API_BASE_URL` verildiğinde API moduna geçer
-- Gelecekteki PostgreSQL şeması ve REST v1 sözleşmesi: `backend/`
+- REST adapter'ı: `VITE_API_BASE_URL` verildiğinde API moduna geçer
+- Çalışır Node.js REST API, PostgreSQL şeması ve production smoke kontrolleri: `backend/`
 - Runtime geocoding provider ayarı: `public/geocoding-config.json`
 - Mobil öncelikli responsive arayüz
 - Vitest ile IndexedDB persistence/migration, takip ve Yakınımda sıralama/filtre testleri
@@ -38,17 +38,7 @@ v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katman
 
 ## Veri katmanı
 
-Varsayılan:
-
-```
-React UI
-   ↓
-IssueRepository
-   ↓
-IndexedDbIssueRepository
-```
-
-Gelecekte backend açıldığında:
+Canlı production:
 
 ```
 React UI
@@ -57,7 +47,19 @@ IssueRepository
    ↓
 ApiIssueRepository
    ↓
-REST API / PostgreSQL
+Railway REST API
+   ↓
+PostgreSQL + S3-compatible object storage
+```
+
+Yerel/fallback:
+
+```
+React UI
+   ↓
+IssueRepository
+   ↓
+IndexedDbIssueRepository
 ```
 
 UI bileşenleri hangi adapter'ın aktif olduğunu bilmez.
@@ -70,7 +72,7 @@ UI bileşenleri hangi adapter'ın aktif olduğunu bilmez.
 VITE_API_BASE_URL=
 ```
 
-Boş bırakılırsa hiçbir dış servis kullanılmaz ve Railway kredisi tüketilmez.
+Boş bırakılırsa IndexedDB modu kullanılır. Canlı Pages build'i `.env.production` üzerinden Railway API'ye bağlıdır.
 
 API URL'si verildiğinde frontend şu sözleşmeyi kullanır:
 
@@ -89,15 +91,19 @@ Ayrıntı: `backend/README.md`
 
 Sorun konumu değiştikten sonra yaklaşık 0,9 saniye beklenir; ardından seçilen koordinat insan tarafından okunabilir mahalle/sokak etiketine çevrilir. Sonuçlar aynı koordinat için tekrar sorgu yapılmaması amacıyla tarayıcıda sınırlı süre cache'lenir.
 
-Adres çözümlenemezse bildirim engellenmez; kayıt koordinat etiketiyle saklanır.\n\nProvider çalışma zamanında `public/geocoding-config.json` üzerinden seçilir. Prototipte public Nominatim kullanılır. Public Nominatim ağır trafik için tasarlanmamıştır; uygulama tarafında istekler seri ve en az 1,1 saniye aralıklı yapılır. Gerçek ölçek öncesi profesyonel veya kendi geocoding altyapımıza geçilmelidir.
+Adres çözümlenemezse bildirim engellenmez; kayıt koordinat etiketiyle saklanır.
+
+Provider çalışma zamanında `public/geocoding-config.json` üzerinden seçilir. Prototipte public Nominatim kullanılır. Public Nominatim ağır trafik için tasarlanmamıştır; uygulama tarafında istekler seri ve en az 1,1 saniye aralıklı yapılır. Gerçek ölçek öncesi profesyonel veya kendi geocoding altyapımıza geçilmelidir.
 
 ## Teknoloji
 - React 19.3
 - TypeScript 7
 - Vite 8.3
 - MapLibre GL JS 6.11.2
-- IndexedDB
-- Gelecekte PostgreSQL uyumlu şema
+- IndexedDB fallback
+- Node.js REST API
+- PostgreSQL
+- Railway S3-compatible object storage
 
 ## Yerelde çalıştırma
 
@@ -121,10 +127,10 @@ npm run preview
 
 ## Bilinen sınırlar
 
-- Veriler şimdilik **yalnız aynı tarayıcı/cihazda** kalıcıdır; kullanıcılar arasında paylaşılmaz.
-- Anonim `clientId` gerçek kullanıcı hesabı değildir.
-- Fotoğraflar prototip aşamasında IndexedDB'de data URL olarak tutulur. Production backend'de object storage kullanılmalıdır.
-- Takip yerelde çalışır; yorum, moderasyon, bildirim gönderimi ve gerçek yetkili hesabı henüz backend'e bağlı değildir.
+- Canlı veriler kullanıcılar arasında paylaşılır; ancak anonim `clientId` hâlâ gerçek kullanıcı hesabı değildir ve localStorage temizlenerek değiştirilebilir.
+- Fotoğraflar canlı API modunda object storage'a yüklenir; yerel IndexedDB modu data URL saklamaya devam eder.
+- Moderasyon/şikâyet, gerçek hesap doğrulama, bildirim gönderimi ve kurum yetki modeli henüz tamamlanmamıştır.
+- Mevcut rate limit tek API process'i içindedir; yatay ölçek öncesi dağıtık rate limiting gerekir.
 - Harita tabanı prototipte doğrudan OpenStreetMap raster tile sunucusunu kullanır; gerçek trafik öncesi production tile altyapısı seçilmelidir.
 - Ters geocoding prototipte public Nominatim kullanır. Kullanım politikası gereği ağır trafik için uygun değildir; gerçek ölçek öncesi kendi/profesyonel geocoder altyapısına geçilmelidir.
 - Manifest mevcut olsa da production offline/PWA katmanı henüz tamamlanmış değildir.
@@ -132,6 +138,6 @@ npm run preview
 
 ## Topluluk katılımı ve ortak backend
 
-v0.5'te yorum ve çözüm doğrulama deneyimi repository katmanına kadar tamamlanmıştır. IndexedDB modunda bu kayıtlar aynı tarayıcı/cihaz içinde kalıcıdır. Bu, UI ve domain davranışını gerçek veritabanına geçmeden test etmemizi sağlar ancak **farklı kullanıcıların birbirinin yorumunu görmesi anlamına gelmez**.
+Canlı GitHub Pages uygulaması `VITE_API_BASE_URL=https://sokak-api-production.up.railway.app` ile ortak Railway backend'e bağlıdır. Farklı cihazlar aynı PostgreSQL sorunlarını, doğrulamaları, takipleri ve topluluk güncellemelerini kullanır.
 
-Gerçek çok-kullanıcılı katılım için `VITE_API_BASE_URL` ile ortak REST backend devreye alınmalıdır. **Çalışır ortak backend kodu**, PostgreSQL şeması ve REST sözleşmesi `backend/` altında hazırdır; CI geçici PostgreSQL üzerinde iki istemcili katılım akışını uçtan uca test eder. Kalıcı servis henüz deploy edilmediğinden canlı GitHub Pages uygulaması bugün hâlâ IndexedDB modundadır. Ortak backend açıldığında mevcut React bileşenlerinin yeniden yazılması gerekmez.
+CI hem geçici PostgreSQL üzerinde iki istemcili katılım akışını test eder hem de production domain için health, storage readiness, CORS ve client-scoped read smoke kontrollerini çalıştırır. IndexedDB implementasyonu local geliştirme/fallback amacıyla korunur.
