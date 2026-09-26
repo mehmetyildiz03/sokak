@@ -1,6 +1,6 @@
 # Sokak backend contract
 
-Bu klasör v0.3'te yalnızca backend sözleşmesini ve gelecekteki PostgreSQL şemasını tanımlar.
+Bu klasör v0.5'te backend sözleşmesini ve gelecekteki PostgreSQL şemasını tanımlar.
 Şu anda Railway veya başka bir sunucu deploy edilmez.
 
 ## Frontend adapter seçimi
@@ -116,9 +116,63 @@ Header:
 }
 ```
 
+
+### GET /v1/issues/:id/community
+
+Sorunun topluluk katmanını döndürür.
+
+200:
+
+```json
+{
+  "comments": [
+    {
+      "id": "cmt-...",
+      "issueId": "iss-...",
+      "authorLabel": "Komşu A12B",
+      "body": "Sorun bugün hâlâ devam ediyor.",
+      "createdAt": "2026-09-27T08:30:00.000Z"
+    }
+  ],
+  "resolution": {
+    "resolvedCount": 3,
+    "stillOpenCount": 1,
+    "myFeedback": "resolved"
+  }
+}
+```
+
+### POST /v1/issues/:id/comments
+
+Body:
+
+```json
+{ "body": "Sorun bugün hâlâ devam ediyor." }
+```
+
+Sunucu yorum metnini doğrular, kimliği kullanıcı/istemci hesabından türetir ve issue `comment_count` alanını aynı transaction içinde artırır.
+
+### PUT /v1/issues/:id/resolution-feedback
+
+Yalnız `Çözüldü` durumundaki kayıtlarda kullanılır. Kişi başına tek kayıt vardır; tekrar gönderim mevcut tercihi günceller, toplamı şişirmez.
+
+Body:
+
+```json
+{ "feedback": "resolved" }
+```
+
+veya:
+
+```json
+{ "feedback": "still_open" }
+```
+
+200 cevabı güncel community snapshot'tır.
+
 ## Kimlik stratejisi
 
-v0.3 yerel aşamada anonim `clientId` kullanılır. Gerçek hesap sistemi geldiğinde repository sözleşmesi korunup header yerine authenticated user id kullanılacaktır.
+v0.5 yerel aşamada anonim `clientId` kullanılır. Gerçek hesap sistemi geldiğinde repository sözleşmesi korunup header yerine authenticated user id kullanılacaktır.
 
 ## Fotoğraflar
 
