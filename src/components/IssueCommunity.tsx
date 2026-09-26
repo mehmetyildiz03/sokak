@@ -87,7 +87,9 @@ export function IssueCommunity({
           <span className="eyebrow">Mahalle katılımı</span>
           <h3 id="communityTitle">Topluluk</h3>
         </div>
-        <span className="community-count">{comments.length} yerel güncelleme</span>
+        <span className="community-count">
+          {comments.length} {import.meta.env.VITE_API_BASE_URL ? 'topluluk güncellemesi' : 'yerel güncelleme'}
+        </span>
       </div>
 
       <div className="comment-composer">
@@ -188,7 +190,9 @@ export function IssueCommunity({
       )}
 
       <p className="local-community-note">
-        Bu sürümde katılım kayıtları yalnız bu cihazda saklanır. Ortak backend bağlandığında aynı arayüz tüm kullanıcıların paylaştığı veriyi gösterecek.
+        {import.meta.env.VITE_API_BASE_URL
+          ? 'Bu güncellemeler ortak Sokak veritabanında paylaşılır. Kişisel bilgi veya kişileri hedef alan içerik ekleme.'
+          : 'Bu sürümde katılım kayıtları yalnız bu cihazda saklanır.'}
       </p>
     </section>
   );
