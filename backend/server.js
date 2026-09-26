@@ -11,12 +11,14 @@ import {
   validateIssueInput,
   validateResolutionFeedback,
 } from './core.js';
+import { decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
 
 const { Pool } = pg;
 
 const PORT = Number(process.env.PORT ?? 3000);
 const DATABASE_URL = process.env.DATABASE_URL;
 const RUN_MIGRATIONS = process.env.RUN_MIGRATIONS !== 'false';
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL ?? '').replace(/\/$/, '');
 const allowedOrigins = new Set(
   (process.env.ALLOWED_ORIGINS ?? 'https://mehmetyildiz03.github.io,http://localhost:5173')
     .split(',')
@@ -484,6 +486,63 @@ async function handleResolutionFeedback(req, res, origin, issueId) {
   sendJson(res, 200, snapshot, origin);
 }
 
+
+async function handleUploadPhoto(req, res, origin) {
+  const clientId = requireClientId(req);
+  requireWriteBudget(clientId);
+  const body = await readJson(req, 12_000_000);
+  const decoded = decodeImageDataUrl(body?.dataUrl);
+  if (!decoded.ok) {
+    sendJson(res, 400, { message: decoded.message }, origin);
+    return;
+  }
+
+  if (!PUBLIC_BASE_URL) {
+    const error = new Error('PUBLIC_BASE_URL environment variable is required for photo URLs.');
+    error.statusCode = 500;
+    throw error;
+  }
+
+  const objectKey = `issue-photos/${new Date().toISOString().slice(0, 10)}/${randomUUID()}.${decoded.value.extension}`;
+  await putIssuePhoto({
+    key: objectKey,
+    body: decoded.value.body,
+    contentType: decoded.value.contentType,
+  });
+
+  sendJson(res, 201, {
+    url: `${PUBLIC_BASE_URL}/v1/media/${encodeURIComponent(objectKey)}`,
+  }, origin);
+}
+
+async function handleGetMedia(res, origin, key) {
+  const object = await getIssuePhoto(key);
+  if (!object?.Body) {
+    sendJson(res, 404, { message: 'Fotoğraf bulunamadı.' }, origin);
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': object.ContentType ?? 'application/octet-stream',
+    'Cache-Control': object.CacheControl ?? 'public, max-age=31536000, immutable',
+    ...corsHeaders(origin),
+  });
+
+  if (typeof object.Body.transformToWebStream === 'function') {
+    const webStream = object.Body.transformToWebStream();
+    for await (const chunk of webStream) {
+      res.write(Buffer.from(chunk));
+    }
+    res.end();
+    return;
+  }
+
+  for await (const chunk of object.Body) {
+    res.write(chunk);
+  }
+  res.end();
+}
+
 async function route(req, res) {
   const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
 
@@ -503,6 +562,22 @@ async function route(req, res) {
   if (req.method === 'GET' && path === '/health') {
     await pool.query('select 1');
     sendJson(res, 200, { ok: true }, origin);
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/v1/uploads/photo') {
+    await handleUploadPhoto(req, res, origin);
+    return;
+  }
+
+  let mediaMatch = path.match(/^\/v1\/media\/(.+)$/);
+  if (mediaMatch && req.method === 'GET') {
+    const key = decodeURIComponent(mediaMatch[1]);
+    if (!/^issue-photos\/[0-9]{4}-[0-9]{2}-[0-9]{2}\/[a-zA-Z0-9-]+\.(jpg|png|webp|heic|heif)$/.test(key)) {
+      sendJson(res, 400, { message: 'Geçersiz medya anahtarı.' }, origin);
+      return;
+    }
+    await handleGetMedia(res, origin, key);
     return;
   }
 
