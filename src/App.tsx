@@ -13,7 +13,15 @@ import {
   filterMapIssues,
   type MapFilterState,
 } from './data/mapFilters';
-import type { Issue, MapMode, Point, ReportDraft } from './types';
+import type {
+  Issue,
+  IssueComment,
+  IssueCommunitySnapshot,
+  MapMode,
+  Point,
+  ReportDraft,
+  ResolutionFeedbackValue,
+} from './types';
 
 const initialCenter: Point = { lng: 30.5566, lat: 37.7648 };
 
@@ -44,6 +52,8 @@ export default function App() {
   const [dataReady, setDataReady] = useState(false);
   const [persistenceAvailable, setPersistenceAvailable] = useState(true);
   const [toast, setToast] = useState('');
+  const [communityByIssueId, setCommunityByIssueId] = useState<Record<string, IssueCommunitySnapshot>>({});
+  const [communityLoadingIssueId, setCommunityLoadingIssueId] = useState<string | null>(null);
 
   const selectedIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
@@ -93,6 +103,43 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(''), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!selectedIssueId) return;
+
+    let cancelled = false;
+    setCommunityLoadingIssueId(selectedIssueId);
+
+    void repository.getCommunitySnapshot(selectedIssueId)
+      .then((snapshot) => {
+        if (cancelled) return;
+        setCommunityByIssueId((current) => ({
+          ...current,
+          [selectedIssueId]: snapshot,
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCommunityByIssueId((current) => ({
+          ...current,
+          [selectedIssueId]: current[selectedIssueId] ?? {
+            comments: [],
+            resolution: {
+              resolvedCount: 0,
+              stillOpenCount: 0,
+              myFeedback: null,
+            },
+          },
+        }));
+      })
+      .finally(() => {
+        if (!cancelled) setCommunityLoadingIssueId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repository, selectedIssueId]);
 
   const requestLocation = (): Promise<Point> => new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -195,6 +242,113 @@ export default function App() {
         : 'Doğrulaman kaydedildi. Teşekkürler.');
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Doğrulama kaydedilemedi.');
+    }
+  };
+
+  const addCommunityComment = async (issueId: string, body: string): Promise<void> => {
+    const trimmed = body.trim();
+    if (trimmed.length < 2) return;
+
+    if (!persistenceAvailable) {
+      const now = new Date().toISOString();
+      const comment: IssueComment = {
+        id: `session-comment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        issueId,
+        authorLabel: 'Bu cihaz',
+        body: trimmed,
+        createdAt: now,
+      };
+
+      setCommunityByIssueId((current) => {
+        const previous = current[issueId] ?? {
+          comments: [],
+          resolution: { resolvedCount: 0, stillOpenCount: 0, myFeedback: null },
+        };
+        return {
+          ...current,
+          [issueId]: {
+            ...previous,
+            comments: [...previous.comments, comment],
+          },
+        };
+      });
+      setIssues((current) => current.map((issue) =>
+        issue.id === issueId ? { ...issue, comments: issue.comments + 1, updatedAt: now } : issue,
+      ));
+      notify('Güncelleme bu oturum için eklendi.');
+      return;
+    }
+
+    try {
+      const comment = await repository.addComment(issueId, trimmed);
+      setCommunityByIssueId((current) => {
+        const previous = current[issueId] ?? {
+          comments: [],
+          resolution: { resolvedCount: 0, stillOpenCount: 0, myFeedback: null },
+        };
+        return {
+          ...current,
+          [issueId]: {
+            ...previous,
+            comments: [...previous.comments, comment],
+          },
+        };
+      });
+      setIssues((current) => current.map((issue) =>
+        issue.id === issueId
+          ? { ...issue, comments: issue.comments + 1, updatedAt: comment.createdAt }
+          : issue,
+      ));
+      notify('Topluluk güncellemen eklendi.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Güncelleme eklenemedi.');
+      throw error;
+    }
+  };
+
+  const setCommunityResolutionFeedback = async (
+    issueId: string,
+    feedback: ResolutionFeedbackValue,
+  ): Promise<void> => {
+    if (!persistenceAvailable) {
+      setCommunityByIssueId((current) => {
+        const previous = current[issueId] ?? {
+          comments: [],
+          resolution: { resolvedCount: 0, stillOpenCount: 0, myFeedback: null },
+        };
+        const resolution = previous.resolution;
+        let resolvedCount = resolution.resolvedCount;
+        let stillOpenCount = resolution.stillOpenCount;
+
+        if (resolution.myFeedback === 'resolved') resolvedCount = Math.max(0, resolvedCount - 1);
+        if (resolution.myFeedback === 'still_open') stillOpenCount = Math.max(0, stillOpenCount - 1);
+        if (feedback === 'resolved') resolvedCount += 1;
+        if (feedback === 'still_open') stillOpenCount += 1;
+
+        return {
+          ...current,
+          [issueId]: {
+            ...previous,
+            resolution: { resolvedCount, stillOpenCount, myFeedback: feedback },
+          },
+        };
+      });
+      notify('Çözüm görüşün bu oturum için kaydedildi.');
+      return;
+    }
+
+    try {
+      const snapshot = await repository.setResolutionFeedback(issueId, feedback);
+      setCommunityByIssueId((current) => ({
+        ...current,
+        [issueId]: snapshot,
+      }));
+      notify(feedback === 'resolved'
+        ? 'Çözüm doğrulaman kaydedildi.'
+        : 'Sorunun devam ettiği geri bildirimi kaydedildi.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Geri bildirim kaydedilemedi.');
+      throw error;
     }
   };
 
@@ -433,6 +587,10 @@ export default function App() {
           onClose={() => setSelectedIssueId(null)}
           onConfirm={confirmIssue}
           onToggleFollow={(id) => void toggleFollow(id)}
+          community={selectedIssue ? communityByIssueId[selectedIssue.id] ?? null : null}
+          communityLoading={selectedIssue ? communityLoadingIssueId === selectedIssue.id : false}
+          onAddComment={addCommunityComment}
+          onResolutionFeedback={setCommunityResolutionFeedback}
         />
 
         <nav className="bottom-nav glass" aria-label="Ana menü">
