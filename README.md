@@ -134,4 +134,4 @@ npm run preview
 
 v0.5'te yorum ve çözüm doğrulama deneyimi repository katmanına kadar tamamlanmıştır. IndexedDB modunda bu kayıtlar aynı tarayıcı/cihaz içinde kalıcıdır. Bu, UI ve domain davranışını gerçek veritabanına geçmeden test etmemizi sağlar ancak **farklı kullanıcıların birbirinin yorumunu görmesi anlamına gelmez**.
 
-Gerçek çok-kullanıcılı katılım için `VITE_API_BASE_URL` ile ortak REST backend devreye alınmalıdır. Gerekli API sözleşmesi ve PostgreSQL şeması `backend/` altında hazırdır. Ortak backend açıldığında mevcut React bileşenlerinin yeniden yazılması gerekmez.
+Gerçek çok-kullanıcılı katılım için `VITE_API_BASE_URL` ile ortak REST backend devreye alınmalıdır. **Çalışır ortak backend kodu**, PostgreSQL şeması ve REST sözleşmesi `backend/` altında hazırdır; CI geçici PostgreSQL üzerinde iki istemcili katılım akışını uçtan uca test eder. Kalıcı servis henüz deploy edilmediğinden canlı GitHub Pages uygulaması bugün hâlâ IndexedDB modundadır. Ortak backend açıldığında mevcut React bileşenlerinin yeniden yazılması gerekmez.
