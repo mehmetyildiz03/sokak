@@ -24,6 +24,7 @@ import type {
 } from './types';
 
 const initialCenter: Point = { lng: 30.5566, lat: 37.7648 };
+const sharedBackendEnabled = Boolean(import.meta.env.VITE_API_BASE_URL?.trim());
 
 function createIssueId(): string {
   return typeof crypto.randomUUID === 'function'
@@ -88,7 +89,9 @@ export default function App() {
       if (cancelled) return;
       setPersistenceAvailable(false);
       setIssues(initialIssues);
-      notify('Yerel veri deposu açılamadı; bu oturum geçici modda çalışıyor.');
+      notify(sharedBackendEnabled
+        ? 'Ortak sunucuya ulaşılamadı; bu oturum geçici modda çalışıyor.'
+        : 'Yerel veri deposu açılamadı; bu oturum geçici modda çalışıyor.');
     }).finally(() => {
       if (!cancelled) setDataReady(true);
     });
@@ -430,7 +433,9 @@ export default function App() {
       setReportOpen(false);
       setSelectedIssueId(stored.id);
       setFocus({ lng: stored.lng, lat: stored.lat, key: Date.now() });
-      notify('Bildirim bu cihazda kalıcı olarak kaydedildi.');
+      notify(sharedBackendEnabled
+        ? 'Bildirim ortak şehir haritasına kaydedildi.'
+        : 'Bildirim bu cihazda kalıcı olarak kaydedildi.');
     } catch (error) {
       notify(error instanceof Error ? error.message : 'Bildirim kaydedilemedi.');
     }
@@ -487,7 +492,7 @@ export default function App() {
             aria-label="Bölge seç"
           >
             <span className="eyebrow">Bölge</span>
-            <strong>Isparta · Demo</strong>
+            <strong>Isparta · Canlı</strong>
           </button>
           <button
             className="icon-btn"
@@ -624,7 +629,7 @@ export default function App() {
           </button>
           <button
             className="nav-item"
-            onClick={() => notify('Profil ve gerçek kimlik doğrulama backend aşamasında eklenecek.')}
+            onClick={() => notify('Profil ve gerçek hesap doğrulama sonraki güvenlik aşamasında eklenecek.')}
           >
             <span>○</span><small>Profil</small>
           </button>
