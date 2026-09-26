@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapView } from './components/MapView';
+import { MapFilterPanel } from './components/MapFilterPanel';
 import { FollowPanel } from './components/FollowPanel';
 import { IssueSheet } from './components/IssueSheet';
 import { NearbyPanel } from './components/NearbyPanel';
 import { ReportFlow } from './components/ReportFlow';
 import { createIssueRepository } from './data/createIssueRepository';
 import { initialIssues } from './data/issues';
+import {
+  countActiveMapFilters,
+  emptyMapFilters,
+  filterMapIssues,
+  type MapFilterState,
+} from './data/mapFilters';
 import type { Issue, MapMode, Point, ReportDraft } from './types';
 
 const initialCenter: Point = { lng: 30.5566, lat: 37.7648 };
@@ -23,6 +30,8 @@ export default function App() {
   const [confirmedIssueIds, setConfirmedIssueIds] = useState<string[]>([]);
   const [followedIssueIds, setFollowedIssueIds] = useState<string[]>([]);
   const [mode, setMode] = useState<MapMode>('issues');
+  const [mapFilters, setMapFilters] = useState<MapFilterState>(emptyMapFilters);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
   const [activeView, setActiveView] = useState<'map' | 'nearby' | 'following'>('map');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [nearbyOrigin, setNearbyOrigin] = useState<Point>(initialCenter);
@@ -39,6 +48,16 @@ export default function App() {
   const selectedIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
     [issues, selectedIssueId],
+  );
+
+  const visibleMapIssues = useMemo(
+    () => filterMapIssues(issues, mapFilters, followedIssueIds),
+    [issues, mapFilters, followedIssueIds],
+  );
+
+  const activeMapFilterCount = useMemo(
+    () => countActiveMapFilters(mapFilters),
+    [mapFilters],
   );
 
   const notify = (message: string) => setToast(message);
@@ -121,6 +140,7 @@ export default function App() {
   const openNearby = () => {
     setSelectedIssueId(null);
     setReportOpen(false);
+    setFilterPanelOpen(false);
     setActiveView('nearby');
 
     if (nearbyDeviceOrigin) {
@@ -206,6 +226,7 @@ export default function App() {
     const issue = issues.find((item) => item.id === id);
     if (!issue) return;
     setReportOpen(false);
+    setFilterPanelOpen(false);
     setActiveView('map');
     setSelectedIssueId(id);
     setMode('issues');
@@ -265,10 +286,15 @@ export default function App() {
     <main className="app-shell">
       <section className="map-screen" aria-label="Şehir sorun haritası">
         <MapView
-          issues={issues}
+          issues={visibleMapIssues}
           mode={mode}
           focus={focus}
-          onSelectIssue={setSelectedIssueId}
+          selectedIssue={selectedIssue}
+          followedIssueIds={followedIssueIds}
+          onSelectIssue={(id) => {
+            setFilterPanelOpen(false);
+            setSelectedIssueId(id);
+          }}
           onCenterChange={setCenter}
         />
 
@@ -335,6 +361,46 @@ export default function App() {
           </button>
         </div>}
 
+        {activeView === 'map' && (
+          <button
+            type="button"
+            className={`map-filter-trigger glass ${activeMapFilterCount > 0 ? 'active' : ''}`}
+            onClick={() => setFilterPanelOpen((open) => !open)}
+            aria-expanded={filterPanelOpen}
+            aria-label="Harita filtrelerini aç"
+          >
+            <span aria-hidden="true">≡</span>
+            <span>Filtre</span>
+            {activeMapFilterCount > 0 && <strong>{activeMapFilterCount}</strong>}
+          </button>
+        )}
+
+        {activeView === 'map' && (
+          <MapFilterPanel
+            open={filterPanelOpen}
+            filters={mapFilters}
+            visibleCount={visibleMapIssues.length}
+            totalCount={issues.length}
+            followedCount={followedIssueIds.length}
+            onChange={setMapFilters}
+            onClose={() => setFilterPanelOpen(false)}
+          />
+        )}
+
+        {activeView === 'map' && activeMapFilterCount > 0 && !filterPanelOpen && (
+          <div className="filter-summary glass" role="status">
+            <span>{visibleMapIssues.length} / {issues.length} kayıt</span>
+            <button type="button" onClick={() => setMapFilters(emptyMapFilters)}>Temizle</button>
+          </div>
+        )}
+
+        {activeView === 'map' && visibleMapIssues.length === 0 && dataReady && (
+          <div className="map-filter-empty glass">
+            <strong>Bu filtrelerle kayıt yok</strong>
+            <button type="button" onClick={() => setMapFilters(emptyMapFilters)}>Tüm kayıtları göster</button>
+          </div>
+        )}
+
         {activeView === 'map' && (mode === 'issues' ? (
           <aside className="map-legend glass" aria-label="Sorun durumları">
             <span><i className="dot dot-new" /> Yeni</span>
@@ -352,6 +418,7 @@ export default function App() {
           disabled={!dataReady}
           onClick={() => {
             setSelectedIssueId(null);
+            setFilterPanelOpen(false);
             setReportOpen(true);
           }}
         >
@@ -373,6 +440,7 @@ export default function App() {
             className={`nav-item ${activeView === 'map' ? 'active' : ''}`}
             onClick={() => {
               setActiveView('map');
+              setFilterPanelOpen(false);
               setMode('issues');
             }}
           >
@@ -390,6 +458,7 @@ export default function App() {
             onClick={() => {
               setSelectedIssueId(null);
               setReportOpen(false);
+              setFilterPanelOpen(false);
               setActiveView('following');
             }}
           >
