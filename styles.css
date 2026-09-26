@@ -1459,3 +1459,11 @@ button:disabled { cursor: default; }
     width: 520px;
   }
 }
+
+.map-error-state .map-empty-icon {
+  background: #fff0ed;
+  color: #a84b3d;
+}
+.map-error-state button {
+  background: #334155;
+}
