@@ -1,4 +1,5 @@
 import { IssueRepositoryError, type ConfirmationResult, type IssueRepository } from './repository';
+import { formatIssueAge } from './time';
 import type {
   Issue,
   IssueComment,
@@ -40,8 +41,12 @@ export class ApiIssueRepository implements IssueRepository {
     return response.json() as Promise<T>;
   }
 
-  listIssues(): Promise<Issue[]> {
-    return this.request<Issue[]>('/v1/issues');
+  async listIssues(): Promise<Issue[]> {
+    const issues = await this.request<Issue[]>('/v1/issues');
+    return issues.map((issue) => ({
+      ...issue,
+      age: formatIssueAge(issue.createdAt, issue.age),
+    }));
   }
 
   async getConfirmedIssueIds(): Promise<string[]> {
