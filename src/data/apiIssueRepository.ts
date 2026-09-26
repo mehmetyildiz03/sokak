@@ -59,10 +59,23 @@ export class ApiIssueRepository implements IssueRepository {
     return response.issueIds;
   }
 
-  createIssue(issue: Issue): Promise<Issue> {
+  async createIssue(issue: Issue): Promise<Issue> {
+    let photoUrl = issue.photoUrl;
+
+    if (photoUrl?.startsWith('data:image/')) {
+      const uploaded = await this.request<{ url: string }>('/v1/uploads/photo', {
+        method: 'POST',
+        body: JSON.stringify({ dataUrl: photoUrl }),
+      });
+      photoUrl = uploaded.url;
+    }
+
     return this.request<Issue>('/v1/issues', {
       method: 'POST',
-      body: JSON.stringify(issue),
+      body: JSON.stringify({
+        ...issue,
+        photoUrl,
+      }),
     });
   }
 
