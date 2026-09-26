@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
@@ -63,4 +63,8 @@ export async function getIssuePhoto(key) {
     Bucket: bucket,
     Key: key,
   }));
+}
+
+export async function checkStorage() {
+  await client.send(new HeadBucketCommand({ Bucket: bucket }));
 }
