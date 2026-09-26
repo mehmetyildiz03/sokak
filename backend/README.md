@@ -1,7 +1,7 @@
 # Sokak backend contract
 
 Bu klasör v0.5'te backend sözleşmesini, PostgreSQL şemasını ve çalışır Node.js REST sunucusunu içerir.
-Sunucu kodu ve PostgreSQL smoke testi CI'da doğrulanır; şu anda Railway veya başka bir kalıcı sunucu deploy edilmez.
+Sunucu Railway production ortamında deploy edilmiştir. PostgreSQL, S3-uyumlu object storage ve production domain smoke kontrolleri aktiftir.
 
 
 ## Çalışır API sunucusu
@@ -9,6 +9,7 @@ Sunucu kodu ve PostgreSQL smoke testi CI'da doğrulanır; şu anda Railway veya 
 - Giriş noktası: `backend/server.js`
 - PostgreSQL sürücüsü: `pg`
 - Sağlık kontrolü: `GET /health`
+- Storage readiness: `GET /health/storage`
 - Şema: başlangıçta `backend/schema.sql` uygulanabilir (`RUN_MIGRATIONS=false` ile kapatılabilir).
 - CORS allowlist: `ALLOWED_ORIGINS`
 - Yazma işlemlerinde `X-Sokak-Client-Id` zorunludur.
@@ -195,20 +196,37 @@ veya:
 
 200 cevabı güncel community snapshot'tır.
 
+### POST /v1/uploads/photo
+
+Header:
+
+`X-Sokak-Client-Id: <anonymous browser id>`
+
+Body:
+
+```json
+{ "dataUrl": "data:image/jpeg;base64,..." }
+```
+
+Desteklenen türler JPEG, PNG, WebP, HEIC ve HEIF; azami boyut 8 MB'dir. API fotoğrafı private S3-uyumlu bucket'a yükler ve medya proxy URL'si döndürür.
+
+### GET /v1/media/:key
+
+Private bucket'taki fotoğrafı güvenli object-key doğrulamasından sonra stream eder. Issue kayıtları yalnız bu HTTPS URL'yi saklar.
+
 ## Kimlik stratejisi
 
 v0.5 yerel aşamada anonim `clientId` kullanılır. Gerçek hesap sistemi geldiğinde repository sözleşmesi korunup header yerine authenticated user id kullanılacaktır.
 
 ## Fotoğraflar
 
-Frontend şu anda IndexedDB'de data URL saklar. Production backend'de fotoğraf binary verisi issue tablosuna gömülmemelidir.
-Object storage'a yüklenip yalnızca URL / object key veritabanında tutulmalıdır.
+IndexedDB modunda frontend data URL saklar. Canlı API modunda `ApiIssueRepository` önce `/v1/uploads/photo` endpoint'ine yükler; private object storage binary'yi tutar ve issue tablosunda yalnız API media URL'si saklanır.
 
 
 ## Production öncesi zorunlu kalanlar
 
 1. Anonim client ID yerine gerçek hesap/oturum doğrulaması.
-2. Fotoğraf için object storage + yükleme endpoint'i; API data-URL fotoğraf kabul etmez.
-3. Dağıtık rate limiting / abuse prevention; mevcut limiter tek process içindir.
-4. Moderasyon, yorum şikâyeti ve kullanıcı engelleme akışları.
-5. Kurum hesabı için ayrı yetki modeli; vatandaş endpoint'leri kurumsal statü değiştiremez.
+2. Dağıtık rate limiting / abuse prevention; mevcut limiter tek process içindir.
+3. Moderasyon, yorum şikâyeti ve kullanıcı engelleme akışları.
+4. Kurum hesabı için ayrı yetki modeli; vatandaş endpoint'leri kurumsal statü değiştiremez.
+5. Yedekleme/restore politikası, gözlemlenebilirlik ve production tile/geocoding kapasite planı.
