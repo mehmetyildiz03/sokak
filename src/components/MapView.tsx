@@ -3,6 +3,7 @@ import * as maplibregl from 'maplibre-gl';
 import {
   AttributionControl,
   NavigationControl,
+  type ExpressionSpecification,
   type GeoJSONSource,
   type Map as MapLibreMap,
   type MapLayerMouseEvent,
@@ -81,7 +82,7 @@ const statusColorExpression = [
   'İşlemde', '#3478c7',
   'Çözüldü', '#2f9d6b',
   '#7d8898',
-] as const;
+] satisfies ExpressionSpecification;
 
 export function MapView({
   issues,
@@ -197,7 +198,7 @@ export function MapView({
         layout: {
           'text-field': ['get', 'point_count_abbreviated'],
           'text-size': 12,
-          'text-font': ['Open Sans Bold'],
+          'text-font': ['Arial', 'Helvetica', 'sans-serif'],
           'text-allow-overlap': true,
         },
         paint: {
