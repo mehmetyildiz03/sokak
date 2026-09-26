@@ -33,3 +33,24 @@ export interface ReportDraft extends Point {
   description: string;
   photoUrl: string;
 }
+
+export type ResolutionFeedbackValue = 'resolved' | 'still_open';
+
+export interface IssueComment {
+  id: string;
+  issueId: string;
+  authorLabel: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface ResolutionFeedbackSummary {
+  resolvedCount: number;
+  stillOpenCount: number;
+  myFeedback: ResolutionFeedbackValue | null;
+}
+
+export interface IssueCommunitySnapshot {
+  comments: IssueComment[];
+  resolution: ResolutionFeedbackSummary;
+}
