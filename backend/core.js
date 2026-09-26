@@ -20,7 +20,7 @@ export function createAuthorLabel(clientId) {
   for (let index = 0; index < clientId.length; index += 1) {
     hash = ((hash << 5) - hash + clientId.charCodeAt(index)) | 0;
   }
-  return \`Komşu \${Math.abs(hash).toString(36).slice(0, 4).toUpperCase().padStart(4, '0')}\`;
+  return `Komşu ${Math.abs(hash).toString(36).slice(0, 4).toUpperCase().padStart(4, '0')}`;
 }
 
 export function validateClientId(value) {
