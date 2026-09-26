@@ -1,4 +1,9 @@
-import type { Issue } from '../types';
+import { IssueCommunity } from './IssueCommunity';
+import type {
+  Issue,
+  IssueCommunitySnapshot,
+  ResolutionFeedbackValue,
+} from '../types';
 
 interface IssueSheetProps {
   issue: Issue | null;
@@ -7,6 +12,13 @@ interface IssueSheetProps {
   onClose: () => void;
   onConfirm: (id: string) => void;
   onToggleFollow: (id: string) => void;
+  community: IssueCommunitySnapshot | null;
+  communityLoading: boolean;
+  onAddComment: (issueId: string, body: string) => Promise<void>;
+  onResolutionFeedback: (
+    issueId: string,
+    feedback: ResolutionFeedbackValue,
+  ) => Promise<void>;
 }
 
 function stageFor(issue: Issue): number {
@@ -16,7 +28,18 @@ function stageFor(issue: Issue): number {
   return 0;
 }
 
-export function IssueSheet({ issue, confirmed, followed, onClose, onConfirm, onToggleFollow }: IssueSheetProps) {
+export function IssueSheet({
+  issue,
+  confirmed,
+  followed,
+  onClose,
+  onConfirm,
+  onToggleFollow,
+  community,
+  communityLoading,
+  onAddComment,
+  onResolutionFeedback,
+}: IssueSheetProps) {
   if (!issue) return null;
 
   const stage = stageFor(issue);
@@ -72,6 +95,14 @@ export function IssueSheet({ issue, confirmed, followed, onClose, onConfirm, onT
             {issue.status === 'Çözüldü' ? 'Sorun çözüldü' : confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
           </button>
         </div>
+
+        <IssueCommunity
+          issue={issue}
+          snapshot={community}
+          loading={communityLoading}
+          onAddComment={onAddComment}
+          onResolutionFeedback={onResolutionFeedback}
+        />
       </div>
     </section>
   );
