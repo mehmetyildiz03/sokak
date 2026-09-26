@@ -2,12 +2,15 @@
 
 Mahalle ve sokak ölçeğindeki kamusal sorunları harita üzerinde görünür, doğrulanabilir ve takip edilebilir hale getirmeyi amaçlayan civic-tech uygulaması.
 
-## v0.3
+## v0.4
 
-v0.3 veri katmanını UI'dan ayırır. Railway veya başka bir sunucu çalıştırmadan bugün IndexedDB kullanır; ileride aynı arayüz REST API'ye bağlanabilir.
+v0.4, v0.3 veri/persistence temelini koruyup haritayı daha ölçeklenebilir bir şehir sorun görünümüne taşır. Railway veya başka bir sunucu çalıştırmadan IndexedDB kullanmaya devam eder; ileride aynı repository arayüzü REST API'ye bağlanabilir.
 
 ### Şu anda çalışanlar
 - MapLibre tabanlı harita
+- MapLibre built-in clustering: uzak zoom'da yakın sorunları sayılı kümelerde toplama, cluster'a dokununca akıllı zoom
+- Harita filtreleri: kategori, durum ve yalnız takip edilenler; filtreler yoğunluk görünümüne de uygulanır
+- Seçili sorun için filtrelerden bağımsız vurgulu marker; takip edilen tekil sorun ve cluster'larda ayrı vurgu
 - Gerçek **Yakınımda** görünümü: cihaz konumu veya harita merkezine göre mesafe sıralaması, Açık/Tümü filtresi ve haritadaki soruna geri dönüş
 - Gerçek **Takip** görünümü: sorun detayından takip et/takibi bırak, cihazda kalıcı takip listesi, açık/çözülmüş özeti ve haritadaki soruna geri dönüş
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
