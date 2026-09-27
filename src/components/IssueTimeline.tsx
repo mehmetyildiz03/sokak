@@ -6,10 +6,11 @@ interface IssueTimelineProps {
   loading: boolean;
 }
 
-function actorLabel(actorType: IssueHistoryEvent['actorType']): string {
-  if (actorType === 'system') return 'Sistem';
-  if (actorType === 'official') return 'Kurum';
-  if (actorType === 'moderator') return 'Moderasyon';
+function actorLabel(event: IssueHistoryEvent): string {
+  if (event.actorType === 'official' && event.actorLabel) return event.actorLabel;
+  if (event.actorType === 'system') return 'Sistem';
+  if (event.actorType === 'official') return 'Kurum';
+  if (event.actorType === 'moderator') return 'Moderasyon';
   return 'Topluluk';
 }
 
@@ -56,7 +57,7 @@ export function IssueTimeline({ events, loading }: IssueTimelineProps) {
                   <small>{formatIssueAge(event.createdAt, 'şimdi')}</small>
                 </div>
                 <span className={`issue-timeline-actor ${event.actorType}`}>
-                  {actorLabel(event.actorType)}
+                  {actorLabel(event)}
                 </span>
                 {event.note && <p>{event.note}</p>}
               </div>
