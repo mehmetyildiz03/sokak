@@ -19,6 +19,10 @@ import {
 } from './data/authApi';
 import { getStoredAuthSession, setStoredAuthSession } from './data/authSession';
 import { getIssueHistory } from './data/issueHistoryApi';
+import {
+  getIssueAuthority,
+  updateOfficialIssueStatus,
+} from './data/officialApi';
 import { listNotifications } from './data/notificationsApi';
 import {
   submitModerationReport,
@@ -34,9 +38,11 @@ import {
 } from './data/mapFilters';
 import type {
   Issue,
+  IssueAuthority,
   IssueComment,
   IssueCommunitySnapshot,
   IssueHistoryEvent,
+  IssueStatus,
   MapMode,
   Point,
   ReportDraft,
@@ -80,6 +86,8 @@ export default function App() {
   const [communityLoadingIssueId, setCommunityLoadingIssueId] = useState<string | null>(null);
   const [historyByIssueId, setHistoryByIssueId] = useState<Record<string, IssueHistoryEvent[]>>({});
   const [historyLoadingIssueId, setHistoryLoadingIssueId] = useState<string | null>(null);
+  const [authorityByIssueId, setAuthorityByIssueId] = useState<Record<string, IssueAuthority | null>>({});
+  const [authorityLoadingIssueId, setAuthorityLoadingIssueId] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<UserProfile | null>(
     () => getStoredAuthSession()?.user ?? null,
   );
@@ -266,6 +274,36 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedIssueId]);
+
+  useEffect(() => {
+    if (!selectedIssueId || !sharedBackendEnabled) return;
+
+    let cancelled = false;
+    setAuthorityLoadingIssueId(selectedIssueId);
+
+    void getIssueAuthority(selectedIssueId)
+      .then((authority) => {
+        if (cancelled) return;
+        setAuthorityByIssueId((current) => ({
+          ...current,
+          [selectedIssueId]: authority,
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAuthorityByIssueId((current) => ({
+          ...current,
+          [selectedIssueId]: current[selectedIssueId] ?? null,
+        }));
+      })
+      .finally(() => {
+        if (!cancelled) setAuthorityLoadingIssueId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIssueId, authUser?.id]);
 
   const requestLocation = (): Promise<Point> => new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -566,6 +604,43 @@ export default function App() {
       notify(error instanceof Error ? error.message : 'Rapor gönderilemedi.');
     } finally {
       setModerationBusy(false);
+    }
+  };
+
+  const handleOfficialStatusUpdate = async (
+    issueId: string,
+    status: Extract<IssueStatus, 'İşlemde' | 'Çözüldü'>,
+    note: string,
+  ) => {
+    try {
+      const result = await updateOfficialIssueStatus(issueId, status, note);
+
+      setIssues((current) => current.map((issue) =>
+        issue.id === issueId ? result.issue : issue,
+      ));
+      setAuthorityByIssueId((current) => ({
+        ...current,
+        [issueId]: result.organization,
+      }));
+
+      try {
+        const events = await getIssueHistory(issueId);
+        setHistoryByIssueId((current) => ({
+          ...current,
+          [issueId]: events,
+        }));
+      } catch {
+        // The status change is already persisted; stale timeline can recover on reopen.
+      }
+
+      notify(
+        status === 'Çözüldü'
+          ? 'Kurum sorunu çözüldü olarak güncelledi.'
+          : 'Kurum durumu İşlemde olarak güncellendi.',
+      );
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Kurum durumu güncellenemedi.');
+      throw error;
     }
   };
 
@@ -870,8 +945,11 @@ export default function App() {
           communityLoading={selectedIssue ? communityLoadingIssueId === selectedIssue.id : false}
           history={selectedIssue ? historyByIssueId[selectedIssue.id] ?? [] : []}
           historyLoading={selectedIssue ? historyLoadingIssueId === selectedIssue.id : false}
+          authority={selectedIssue ? authorityByIssueId[selectedIssue.id] ?? null : null}
+          authorityLoading={selectedIssue ? authorityLoadingIssueId === selectedIssue.id : false}
           onAddComment={addCommunityComment}
           onResolutionFeedback={setCommunityResolutionFeedback}
+          onOfficialStatusUpdate={handleOfficialStatusUpdate}
           onReportIssue={(issue) => openModerationReport('issue', issue.id, issue.title)}
           onReportComment={(commentId, label) => openModerationReport('comment', commentId, label)}
         />
