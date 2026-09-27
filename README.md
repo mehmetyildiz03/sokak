@@ -15,6 +15,8 @@ v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katman
 - Gerçek **Takip** görünümü: sorun detayından takip et/takibi bırak, cihazda kalıcı takip listesi, açık/çözülmüş özeti ve haritadaki soruna geri dönüş
 - **Topluluk katılımı**: sorun detayında mahalle güncellemesi/yorum bırakma, kalıcı yorum geçmişi ve anonim/hesaplı kullanıcı etiketi
 - Gerçek **Profil / hesap**: kullanıcı adı + görünen ad + parola ile kayıt/giriş, 30 günlük oturum, farklı cihazlarda aynı takip/doğrulama/yorum kimliği ve cihaz geçmişini hesaba bağlama
+- **Moderasyon / içerik raporlama**: giriş yapmış kullanıcı sorun veya yorumu neden seçerek incelemeye gönderebilir; aynı açık rapor tekrar oluşturulamaz
+- **Moderatör inceleme kuyruğu**: yalnız `moderator/admin` rolü açık/incelemede/çözüldü/reddedildi raporlarını görebilir ve audit notuyla durumlandırabilir
 - **Çözüm doğrulaması**: çözülmüş kayıtlarda “Düzeldi / Devam ediyor” geri bildirimi; kişi başına tek kayıt, tercih değiştirilebilir ve toplam şişmez
 - Topluluk çözüm sinyali kurumsal durumu otomatik değiştirmez; gerçek kurum hesabı/entegrasyonu ayrı tutulur
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
@@ -130,7 +132,7 @@ npm run preview
 
 - Hesap açmadan kullanım anonim `clientId` ile devam eder; hesap açan kullanıcıların takip/doğrulama/yorum kimliği kullanıcı hesabına bağlanır. Anonim geçmiş tek seferlik hesaba taşınabilir.
 - Fotoğraflar canlı API modunda object storage'a yüklenir; yerel IndexedDB modu data URL saklamaya devam eder.
-- Moderasyon/şikâyet, e-posta/telefon gibi ikinci faktörlü hesap doğrulama, bildirim gönderimi ve kurum yetki modeli henüz tamamlanmamıştır.
+- Moderasyon raporlama ve inceleme kuyruğu vardır; ancak içerik gizleme/silme yaptırımları, itiraz akışı, e-posta/telefon doğrulama, bildirim gönderimi ve kurum yetki modeli henüz tamamlanmamıştır.
 - Mevcut rate limit tek API process'i içindedir; yatay ölçek öncesi dağıtık rate limiting gerekir.
 - Harita tabanı prototipte doğrudan OpenStreetMap raster tile sunucusunu kullanır; gerçek trafik öncesi production tile altyapısı seçilmelidir.
 - Ters geocoding prototipte public Nominatim kullanır. Kullanım politikası gereği ağır trafik için uygun değildir; gerçek ölçek öncesi kendi/profesyonel geocoder altyapısına geçilmelidir.
