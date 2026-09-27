@@ -456,6 +456,15 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   assert.equal(organization.name, 'Smoke Belediyesi');
   assert.ok(organization.verifiedAt);
 
+  response = await fetch(`${baseUrl}/v1/admin/organizations`, {
+    headers: adminHeaders,
+  });
+  assert.equal(response.status, 200);
+  const adminOrganizations = await response.json();
+  assert.ok(
+    adminOrganizations.organizations.some((item) => item.id === organization.id),
+  );
+
   response = await fetch(
     `${baseUrl}/v1/admin/organizations/${organization.id}/memberships`,
     {
