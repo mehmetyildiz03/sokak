@@ -177,6 +177,7 @@ export function validateModerationReport(payload) {
 
 export function validateModerationReview(payload) {
   const status = payload?.status;
+  const contentAction = payload?.contentAction ?? 'none';
   const moderatorNote = typeof payload?.moderatorNote === 'string'
     ? payload.moderatorNote.trim()
     : '';
@@ -184,14 +185,21 @@ export function validateModerationReview(payload) {
   if (!['reviewing', 'resolved', 'dismissed'].includes(status)) {
     return { ok: false, message: 'Moderasyon durumu geçersiz.' };
   }
+  if (!['none', 'hide', 'restore'].includes(contentAction)) {
+    return { ok: false, message: 'İçerik işlemi geçersiz.' };
+  }
   if (moderatorNote.length > 1000) {
     return { ok: false, message: 'Moderatör notu en fazla 1000 karakter olabilir.' };
+  }
+  if ((contentAction === 'hide' || contentAction === 'restore') && status !== 'resolved') {
+    return { ok: false, message: 'İçerik görünürlüğü işlemleri rapor çözüldüğünde uygulanabilir.' };
   }
 
   return {
     ok: true,
     value: {
       status,
+      contentAction,
       moderatorNote: moderatorNote || null,
     },
   };
