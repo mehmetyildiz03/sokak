@@ -6,6 +6,7 @@ import {
   validateCommentBody,
   validateIssueInput,
   validateModerationReport,
+  validateModerationReview,
   validateResolutionFeedback,
 } from './core.js';
 
@@ -87,5 +88,19 @@ test('moderation report validation accepts bounded reasons and notes', () => {
     targetId: 'iss-123456',
     reason: 'other',
     note: '',
+  }).ok, false);
+});
+
+
+test('moderation review validation restricts statuses and note size', () => {
+  assert.equal(validateModerationReview({
+    status: 'reviewing',
+    moderatorNote: 'İncelemeye alındı.',
+  }).ok, true);
+
+  assert.equal(validateModerationReview({ status: 'open' }).ok, false);
+  assert.equal(validateModerationReview({
+    status: 'resolved',
+    moderatorNote: 'x'.repeat(1001),
   }).ok, false);
 });
