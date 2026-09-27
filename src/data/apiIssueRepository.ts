@@ -1,5 +1,6 @@
 import { IssueRepositoryError, type ConfirmationResult, type IssueRepository } from './repository';
 import { formatIssueAge } from './time';
+import { getStoredAuthToken } from './authSession';
 import type {
   Issue,
   IssueComment,
@@ -23,6 +24,7 @@ export class ApiIssueRepository implements IssueRepository {
       headers: {
         'Content-Type': 'application/json',
         'X-Sokak-Client-Id': this.clientId,
+        ...(getStoredAuthToken() ? { Authorization: `Bearer ${getStoredAuthToken()}` } : {}),
         ...init?.headers,
       },
     });
