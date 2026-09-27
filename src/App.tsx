@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AdminInstitutionPanel } from './components/AdminInstitutionPanel';
 import { MapView } from './components/MapView';
 import { MapFilterPanel } from './components/MapFilterPanel';
 import { ModerationQueuePanel } from './components/ModerationQueuePanel';
@@ -68,7 +69,7 @@ export default function App() {
   const [mode, setMode] = useState<MapMode>('issues');
   const [mapFilters, setMapFilters] = useState<MapFilterState>(emptyMapFilters);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [activeView, setActiveView] = useState<'map' | 'nearby' | 'following' | 'profile' | 'moderation'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'nearby' | 'following' | 'profile' | 'moderation' | 'admin'>('map');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [nearbyOrigin, setNearbyOrigin] = useState<Point>(initialCenter);
   const [nearbyDeviceOrigin, setNearbyDeviceOrigin] = useState<Point | null>(null);
@@ -784,11 +785,20 @@ export default function App() {
             onLogout={handleLogout}
             onClaimDevice={handleClaimDevice}
             onOpenModeration={() => setActiveView('moderation')}
+            onOpenAdminInstitutions={() => setActiveView('admin')}
           />
         )}
 
         {activeView === 'moderation' && (
           <ModerationQueuePanel
+            onBack={() => setActiveView('profile')}
+            notify={notify}
+          />
+        )}
+
+        {activeView === 'admin' && (
+          <AdminInstitutionPanel
+            issues={issues}
             onBack={() => setActiveView('profile')}
             notify={notify}
           />
