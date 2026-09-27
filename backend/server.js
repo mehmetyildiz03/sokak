@@ -822,6 +822,37 @@ async function handleConfirmation(req, res, origin, issueId) {
   }, origin);
 }
 
+async function handleGetIssueHistory(res, origin, issueId) {
+  const issue = await pool.query(
+    'select 1 from issues where id = $1 and hidden_at is null',
+    [issueId],
+  );
+  if (issue.rowCount === 0) {
+    sendJson(res, 404, { message: 'Sorun kaydı bulunamadı.' }, origin);
+    return;
+  }
+
+  const result = await pool.query(
+    `select id, from_status, to_status, actor_type, note, created_at
+     from status_history
+     where issue_id = $1
+     order by created_at asc, id asc
+     limit 200`,
+    [issueId],
+  );
+
+  sendJson(res, 200, {
+    events: result.rows.map((row) => ({
+      id: row.id,
+      fromStatus: row.from_status,
+      toStatus: row.to_status,
+      actorType: row.actor_type,
+      note: row.note,
+      createdAt: new Date(row.created_at).toISOString(),
+    })),
+  }, origin);
+}
+
 async function handleGetCommunity(req, res, origin, issueId) {
   const actor = await resolveActor(req);
   const clientId = actor.actorId;
@@ -1435,6 +1466,12 @@ async function route(req, res) {
   match = path.match(/^\/v1\/issues\/([^/]+)\/confirmations$/);
   if (match && req.method === 'POST') {
     await handleConfirmation(req, res, origin, decodeId(match[1]));
+    return;
+  }
+
+  match = path.match(/^\/v1\/issues\/([^/]+)\/history$/);
+  if (match && req.method === 'GET') {
+    await handleGetIssueHistory(res, origin, decodeId(match[1]));
     return;
   }
 
