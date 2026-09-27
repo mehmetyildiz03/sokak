@@ -188,6 +188,42 @@ export default function App() {
     if (!sharedBackendEnabled) return;
 
     let cancelled = false;
+    let refreshing = false;
+
+    const refreshSharedMap = async () => {
+      if (refreshing || document.visibilityState !== 'visible') return;
+      refreshing = true;
+      try {
+        const storedIssues = await repository.listIssues();
+        if (!cancelled) setIssues(storedIssues);
+      } catch {
+        // Keep the last known city map visible during transient network failures.
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refreshSharedMap();
+    };
+
+    const timer = window.setInterval(() => {
+      void refreshSharedMap();
+    }, 12_000);
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [repository, dataReloadKey]);
+
+  useEffect(() => {
+    if (!sharedBackendEnabled) return;
+
+    let cancelled = false;
     const refreshNotificationCount = () => {
       void listNotifications(1)
         .then((snapshot) => {
@@ -244,7 +280,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [repository, selectedIssueId]);
+  }, [repository, selectedIssueId, selectedIssue?.comments]);
 
   useEffect(() => {
     if (!selectedIssueId || !sharedBackendEnabled) return;
@@ -274,7 +310,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedIssueId]);
+  }, [selectedIssueId, selectedIssue?.status]);
 
   useEffect(() => {
     if (!selectedIssueId || !sharedBackendEnabled) return;
@@ -439,7 +475,9 @@ export default function App() {
         };
       });
       setIssues((current) => current.map((issue) =>
-        issue.id === issueId ? { ...issue, comments: issue.comments + 1, updatedAt: now } : issue,
+        issue.id === issueId
+          ? { ...issue, comments: issue.comments + 1, lastCommentAt: now, updatedAt: now }
+          : issue,
       ));
       notify('Güncelleme bu oturum için eklendi.');
       return;
@@ -462,7 +500,12 @@ export default function App() {
       });
       setIssues((current) => current.map((issue) =>
         issue.id === issueId
-          ? { ...issue, comments: issue.comments + 1, updatedAt: comment.createdAt }
+          ? {
+              ...issue,
+              comments: issue.comments + 1,
+              lastCommentAt: comment.createdAt,
+              updatedAt: comment.createdAt,
+            }
           : issue,
       ));
       notify('Topluluk güncellemen eklendi.');
