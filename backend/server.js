@@ -1430,6 +1430,43 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
 }
 
 
+async function handleListOrganizations(req, res, origin) {
+  await requireAdmin(req);
+
+  const result = await pool.query(
+    `select
+       o.id,
+       o.name,
+       o.slug,
+       o.kind,
+       o.verified_at,
+       o.created_at,
+       count(distinct om.user_id)::int as member_count,
+       count(distinct ia.issue_id)::int as assigned_issue_count
+     from organizations o
+     left join organization_memberships om
+       on om.organization_id = o.id and om.active = true
+     left join issue_assignments ia
+       on ia.organization_id = o.id
+     where o.verified_at is not null
+     group by o.id
+     order by o.name asc`,
+  );
+
+  sendJson(res, 200, {
+    organizations: result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      kind: row.kind,
+      verifiedAt: new Date(row.verified_at).toISOString(),
+      createdAt: new Date(row.created_at).toISOString(),
+      memberCount: Number(row.member_count),
+      assignedIssueCount: Number(row.assigned_issue_count),
+    })),
+  }, origin);
+}
+
 async function handleCreateOrganization(req, res, origin) {
   const admin = await requireAdmin(req);
   const body = await readJson(req);
@@ -1708,6 +1745,11 @@ async function route(req, res) {
   }
   if (req.method === 'POST' && path === '/v1/auth/claim-device') {
     await handleClaimDevice(req, res, origin);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/v1/admin/organizations') {
+    await handleListOrganizations(req, res, origin);
     return;
   }
 
