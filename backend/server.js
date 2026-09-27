@@ -850,7 +850,7 @@ async function handleModerationReport(req, res, origin) {
   const input = validated.value;
   const targetTable = input.targetType === 'issue' ? 'issues' : 'comments';
   const exists = await pool.query(
-    `select 1 from ${targetTable} where id = $1 limit 1`,
+    `select 1 from ${targetTable} where id = $1 and hidden_at is null limit 1`,
     [input.targetId],
   );
 
