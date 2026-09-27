@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapView } from './components/MapView';
 import { MapFilterPanel } from './components/MapFilterPanel';
+import { ModerationReportDialog } from './components/ModerationReportDialog';
 import { FollowPanel } from './components/FollowPanel';
 import { IssueSheet } from './components/IssueSheet';
 import { NearbyPanel } from './components/NearbyPanel';
@@ -15,6 +16,11 @@ import {
   registerAccount,
 } from './data/authApi';
 import { getStoredAuthSession, setStoredAuthSession } from './data/authSession';
+import {
+  submitModerationReport,
+  type ModerationReportInput,
+  type ModerationTargetType,
+} from './data/moderationApi';
 import { initialIssues } from './data/issues';
 import {
   countActiveMapFilters,
@@ -71,6 +77,12 @@ export default function App() {
     () => getStoredAuthSession()?.user ?? null,
   );
   const [authBusy, setAuthBusy] = useState(false);
+  const [moderationTarget, setModerationTarget] = useState<{
+    type: ModerationTargetType;
+    id: string;
+    label: string;
+  } | null>(null);
+  const [moderationBusy, setModerationBusy] = useState(false);
 
   const selectedIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
@@ -462,6 +474,36 @@ export default function App() {
     }
   };
 
+  const openModerationReport = (
+    type: ModerationTargetType,
+    id: string,
+    label: string,
+  ) => {
+    if (!authUser) {
+      setSelectedIssueId(null);
+      setReportOpen(false);
+      setFilterPanelOpen(false);
+      setActiveView('profile');
+      notify('İçeriği raporlamak için hesabına giriş yapmalısın.');
+      return;
+    }
+
+    setModerationTarget({ type, id, label });
+  };
+
+  const handleModerationSubmit = async (input: ModerationReportInput) => {
+    setModerationBusy(true);
+    try {
+      await submitModerationReport(input);
+      setModerationTarget(null);
+      notify('Rapor inceleme kuyruğuna gönderildi.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Rapor gönderilemedi.');
+    } finally {
+      setModerationBusy(false);
+    }
+  };
+
   const toggleFollow = async (id: string) => {
     const shouldFollow = !followedIssueIds.includes(id);
 
@@ -746,6 +788,8 @@ export default function App() {
           communityLoading={selectedIssue ? communityLoadingIssueId === selectedIssue.id : false}
           onAddComment={addCommunityComment}
           onResolutionFeedback={setCommunityResolutionFeedback}
+          onReportIssue={(issue) => openModerationReport('issue', issue.id, issue.title)}
+          onReportComment={(commentId, label) => openModerationReport('comment', commentId, label)}
         />
 
         <nav className="bottom-nav glass" aria-label="Ana menü">
@@ -790,6 +834,15 @@ export default function App() {
           </button>
         </nav>
       </section>
+
+      <ModerationReportDialog
+        target={moderationTarget}
+        busy={moderationBusy}
+        onClose={() => {
+          if (!moderationBusy) setModerationTarget(null);
+        }}
+        onSubmit={handleModerationSubmit}
+      />
 
       <ReportFlow
         open={reportOpen}
