@@ -87,7 +87,7 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
     }),
   });
   const createBody = await response.text();
-  assert.equal(response.status, 201, createBody);
+  assert.equal(response.status, 201, `${createBody}\n${stderr}`);
   const created = JSON.parse(createBody);
   assert.equal(created.status, 'Yeni');
   assert.equal(created.confirms, 1);
