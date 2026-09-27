@@ -57,6 +57,8 @@ export interface ModerationQueueItem {
   note: string | null;
   status: ModerationStatus;
   moderatorNote: string | null;
+  actionTaken: 'none' | 'hide' | 'restore';
+  targetHidden: boolean;
   reviewedAt: string | null;
   createdAt: string;
   reporter: {
@@ -109,12 +111,13 @@ export async function reviewModerationReport(
   id: string,
   status: Exclude<ModerationStatus, 'open'>,
   moderatorNote?: string,
+  contentAction: 'none' | 'hide' | 'restore' = 'none',
 ): Promise<void> {
   await moderationRequest(
     `/v1/moderation/reports/${encodeURIComponent(id)}`,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status, moderatorNote }),
+      body: JSON.stringify({ status, moderatorNote, contentAction }),
     },
   );
 }
