@@ -5,6 +5,7 @@ import {
   validateClientId,
   validateCommentBody,
   validateIssueInput,
+  validateModerationReport,
   validateResolutionFeedback,
 } from './core.js';
 
@@ -62,4 +63,29 @@ test('comment and resolution feedback validation', () => {
   assert.equal(validateCommentBody({ body: ' ' }).ok, false);
   assert.equal(validateResolutionFeedback({ feedback: 'resolved' }).ok, true);
   assert.equal(validateResolutionFeedback({ feedback: 'other' }).ok, false);
+});
+
+
+test('moderation report validation accepts bounded reasons and notes', () => {
+  const valid = validateModerationReport({
+    targetType: 'comment',
+    targetId: 'cmt-123456',
+    reason: 'harassment',
+    note: 'Kişiyi hedef alan ifade içeriyor.',
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.value.targetType, 'comment');
+
+  assert.equal(validateModerationReport({
+    targetType: 'issue',
+    targetId: 'iss-123456',
+    reason: 'unknown',
+  }).ok, false);
+
+  assert.equal(validateModerationReport({
+    targetType: 'issue',
+    targetId: 'iss-123456',
+    reason: 'other',
+    note: '',
+  }).ok, false);
 });
