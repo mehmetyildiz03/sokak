@@ -402,7 +402,7 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   );
   await adminDb.end();
 
-  const officialUsername = `official_status_user_${Date.now()}`;
+  const officialUsername = `off_${Date.now()}`;
   const officialClientId = `smoke-official-${Date.now()}`;
   response = await fetch(`${baseUrl}/v1/auth/register`, {
     method: 'POST',
@@ -419,7 +419,7 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   assert.equal(response.status, 201);
   const officialAccount = await response.json();
 
-  const outsiderUsername = `outsider_status_user_${Date.now()}`;
+  const outsiderUsername = `out_${Date.now()}`;
   const outsiderClientId = `smoke-outsider-${Date.now()}`;
   response = await fetch(`${baseUrl}/v1/auth/register`, {
     method: 'POST',
