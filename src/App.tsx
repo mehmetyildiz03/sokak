@@ -4,8 +4,17 @@ import { MapFilterPanel } from './components/MapFilterPanel';
 import { FollowPanel } from './components/FollowPanel';
 import { IssueSheet } from './components/IssueSheet';
 import { NearbyPanel } from './components/NearbyPanel';
+import { ProfilePanel } from './components/ProfilePanel';
 import { ReportFlow } from './components/ReportFlow';
 import { createIssueRepository } from './data/createIssueRepository';
+import {
+  claimDeviceHistory,
+  loginAccount,
+  logoutAccount,
+  refreshAccount,
+  registerAccount,
+} from './data/authApi';
+import { getStoredAuthSession, setStoredAuthSession } from './data/authSession';
 import { initialIssues } from './data/issues';
 import {
   countActiveMapFilters,
@@ -21,6 +30,7 @@ import type {
   Point,
   ReportDraft,
   ResolutionFeedbackValue,
+  UserProfile,
 } from './types';
 
 const initialCenter: Point = { lng: 30.5566, lat: 37.7648 };
@@ -41,7 +51,7 @@ export default function App() {
   const [mode, setMode] = useState<MapMode>('issues');
   const [mapFilters, setMapFilters] = useState<MapFilterState>(emptyMapFilters);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
-  const [activeView, setActiveView] = useState<'map' | 'nearby' | 'following'>('map');
+  const [activeView, setActiveView] = useState<'map' | 'nearby' | 'following' | 'profile'>('map');
   const [center, setCenter] = useState<Point>(initialCenter);
   const [nearbyOrigin, setNearbyOrigin] = useState<Point>(initialCenter);
   const [nearbyDeviceOrigin, setNearbyDeviceOrigin] = useState<Point | null>(null);
@@ -57,6 +67,10 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [communityByIssueId, setCommunityByIssueId] = useState<Record<string, IssueCommunitySnapshot>>({});
   const [communityLoadingIssueId, setCommunityLoadingIssueId] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<UserProfile | null>(
+    () => getStoredAuthSession()?.user ?? null,
+  );
+  const [authBusy, setAuthBusy] = useState(false);
 
   const selectedIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
@@ -118,6 +132,27 @@ export default function App() {
     const timer = window.setTimeout(() => setToast(''), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!sharedBackendEnabled || !getStoredAuthSession()) return;
+
+    let cancelled = false;
+    void refreshAccount()
+      .then((user) => {
+        if (!cancelled) setAuthUser(user);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStoredAuthSession(null);
+        setAuthUser(null);
+        setDataReloadKey((key) => key + 1);
+        notify('Oturum süresi doldu; anonim moda geçildi.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedIssueId) return;
@@ -367,6 +402,66 @@ export default function App() {
     }
   };
 
+  const handleLogin = async (input: { username: string; password: string }) => {
+    setAuthBusy(true);
+    try {
+      const session = await loginAccount(input);
+      setAuthUser(session.user);
+      setDataReloadKey((key) => key + 1);
+      notify(`Hoş geldin, ${session.user.displayName}.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Giriş yapılamadı.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleRegister = async (input: {
+    username: string;
+    displayName: string;
+    password: string;
+  }) => {
+    setAuthBusy(true);
+    try {
+      const session = await registerAccount(input);
+      setAuthUser(session.user);
+      setDataReloadKey((key) => key + 1);
+      notify('Hesabın oluşturuldu.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Hesap oluşturulamadı.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleClaimDevice = async () => {
+    setAuthBusy(true);
+    try {
+      const user = await claimDeviceHistory();
+      setAuthUser(user);
+      setDataReloadKey((key) => key + 1);
+      notify('Bu cihazdaki anonim katkılar hesabına bağlandı.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Cihaz geçmişi bağlanamadı.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setAuthBusy(true);
+    try {
+      await logoutAccount();
+      setAuthUser(null);
+      setDataReloadKey((key) => key + 1);
+      notify('Hesaptan çıkıldı; anonim moda geçildi.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Çıkış tamamlanamadı.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   const toggleFollow = async (id: string) => {
     const shouldFollow = !followedIssueIds.includes(id);
 
@@ -493,6 +588,17 @@ export default function App() {
             followedIssueIds={followedIssueIds}
             onSelectIssue={openExistingIssue}
             onUnfollow={(id) => void toggleFollow(id)}
+          />
+        )}
+
+        {activeView === 'profile' && (
+          <ProfilePanel
+            user={authUser}
+            busy={authBusy}
+            onLogin={handleLogin}
+            onRegister={handleRegister}
+            onLogout={handleLogout}
+            onClaimDevice={handleClaimDevice}
           />
         )}
 
@@ -672,10 +778,15 @@ export default function App() {
             <span>{followedIssueIds.length > 0 ? '♥' : '♡'}</span><small>Takip</small>
           </button>
           <button
-            className="nav-item"
-            onClick={() => notify('Profil ve gerçek hesap doğrulama sonraki güvenlik aşamasında eklenecek.')}
+            className={`nav-item ${activeView === 'profile' ? 'active' : ''}`}
+            onClick={() => {
+              setSelectedIssueId(null);
+              setReportOpen(false);
+              setFilterPanelOpen(false);
+              setActiveView('profile');
+            }}
           >
-            <span>○</span><small>Profil</small>
+            <span>{authUser ? '●' : '○'}</span><small>Profil</small>
           </button>
         </nav>
       </section>
