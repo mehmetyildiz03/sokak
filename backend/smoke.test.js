@@ -393,4 +393,201 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
     moderationNotifications.notifications.filter((item) => item.type === 'moderation').length >= 2,
   );
   assert.ok(moderationNotifications.unreadCount >= 2);
+
+  // Bootstrap the smoke-test administrator explicitly; production has no automatic first-admin rule.
+  const adminDb = new Pool({ connectionString: databaseUrl });
+  await adminDb.query(
+    `update users set role = 'admin', updated_at = now() where id = $1`,
+    [registered.user.id],
+  );
+  await adminDb.end();
+
+  const officialUsername = `official_status_user_${Date.now()}`;
+  const officialClientId = `smoke-official-${Date.now()}`;
+  response = await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sokak-Client-Id': officialClientId,
+    },
+    body: JSON.stringify({
+      username: officialUsername,
+      displayName: 'Smoke Kurum Yetkilisi',
+      password: 'official-smoke-password-123',
+    }),
+  });
+  assert.equal(response.status, 201);
+  const officialAccount = await response.json();
+
+  const outsiderUsername = `outsider_status_user_${Date.now()}`;
+  const outsiderClientId = `smoke-outsider-${Date.now()}`;
+  response = await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sokak-Client-Id': outsiderClientId,
+    },
+    body: JSON.stringify({
+      username: outsiderUsername,
+      displayName: 'Smoke Dış Kullanıcı',
+      password: 'outsider-smoke-password-123',
+    }),
+  });
+  assert.equal(response.status, 201);
+  const outsiderAccount = await response.json();
+
+  const adminHeaders = {
+    'Content-Type': 'application/json',
+    'X-Sokak-Client-Id': secondDeviceId,
+    Authorization: `Bearer ${registered.token}`,
+  };
+
+  response = await fetch(`${baseUrl}/v1/admin/organizations`, {
+    method: 'POST',
+    headers: adminHeaders,
+    body: JSON.stringify({
+      name: 'Smoke Belediyesi',
+      slug: `smoke-belediyesi-${Date.now()}`,
+      kind: 'municipality',
+    }),
+  });
+  assert.equal(response.status, 201);
+  const organization = await response.json();
+  assert.equal(organization.name, 'Smoke Belediyesi');
+  assert.ok(organization.verifiedAt);
+
+  response = await fetch(
+    `${baseUrl}/v1/admin/organizations/${organization.id}/memberships`,
+    {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        username: officialUsername,
+        role: 'official',
+      }),
+    },
+  );
+  assert.equal(response.status, 200);
+
+  response = await fetch(`${baseUrl}/v1/issues`, {
+    method: 'POST',
+    headers: headersA,
+    body: JSON.stringify({
+      category: 'light',
+      categoryLabel: 'Aydınlatma',
+      emoji: '💡',
+      title: 'Smoke kurum süreci lambası',
+      place: 'Test Mahallesi · Kurum Sokak',
+      description: 'Kurum statü akışını doğrulamak için oluşturulan test kaydı.',
+      lng: 30.5577,
+      lat: 37.7659,
+      severity: 2,
+    }),
+  });
+  assert.equal(response.status, 201);
+  const officialIssue = await response.json();
+  assert.equal(officialIssue.status, 'Yeni');
+
+  response = await fetch(
+    `${baseUrl}/v1/admin/issues/${officialIssue.id}/assignment`,
+    {
+      method: 'PUT',
+      headers: adminHeaders,
+      body: JSON.stringify({ organizationId: organization.id }),
+    },
+  );
+  assert.equal(response.status, 200);
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/authority`, {
+    headers: {
+      'X-Sokak-Client-Id': officialClientId,
+      Authorization: `Bearer ${officialAccount.token}`,
+    },
+  });
+  assert.equal(response.status, 200);
+  let authority = await response.json();
+  assert.equal(authority.organization.name, 'Smoke Belediyesi');
+  assert.equal(authority.organization.canUpdateStatus, true);
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/authority`, {
+    headers: headersA,
+  });
+  assert.equal(response.status, 200);
+  authority = await response.json();
+  assert.equal(authority.organization.name, 'Smoke Belediyesi');
+  assert.equal(authority.organization.canUpdateStatus, false);
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sokak-Client-Id': outsiderClientId,
+      Authorization: `Bearer ${outsiderAccount.token}`,
+    },
+    body: JSON.stringify({
+      status: 'İşlemde',
+      note: 'Yetkisiz kullanıcı denemesi.',
+    }),
+  });
+  assert.equal(response.status, 403);
+
+  const officialHeaders = {
+    'Content-Type': 'application/json',
+    'X-Sokak-Client-Id': officialClientId,
+    Authorization: `Bearer ${officialAccount.token}`,
+  };
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/status`, {
+    method: 'PATCH',
+    headers: officialHeaders,
+    body: JSON.stringify({
+      status: 'Çözüldü',
+      note: 'Doğrudan çözüm denemesi reddedilmeli.',
+    }),
+  });
+  assert.equal(response.status, 409);
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/status`, {
+    method: 'PATCH',
+    headers: officialHeaders,
+    body: JSON.stringify({
+      status: 'İşlemde',
+      note: 'Saha ekibi inceleme için yönlendirildi.',
+    }),
+  });
+  assert.equal(response.status, 200);
+  let officialStatus = await response.json();
+  assert.equal(officialStatus.issue.status, 'İşlemde');
+  assert.equal(officialStatus.organization.name, 'Smoke Belediyesi');
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/status`, {
+    method: 'PATCH',
+    headers: officialHeaders,
+    body: JSON.stringify({
+      status: 'Çözüldü',
+      note: 'Armatür yenilendi ve saha kontrolü tamamlandı.',
+    }),
+  });
+  assert.equal(response.status, 200);
+  officialStatus = await response.json();
+  assert.equal(officialStatus.issue.status, 'Çözüldü');
+
+  response = await fetch(`${baseUrl}/v1/issues/${officialIssue.id}/history`);
+  assert.equal(response.status, 200);
+  const officialHistory = await response.json();
+  assert.equal(officialHistory.events.length, 3);
+  assert.equal(officialHistory.events[1].actorType, 'official');
+  assert.equal(officialHistory.events[1].actorLabel, 'Smoke Belediyesi');
+  assert.equal(officialHistory.events[1].toStatus, 'İşlemde');
+  assert.equal(officialHistory.events[2].actorLabel, 'Smoke Belediyesi');
+  assert.equal(officialHistory.events[2].toStatus, 'Çözüldü');
+
+  response = await fetch(`${baseUrl}/v1/me/notifications`, { headers: headersA });
+  assert.equal(response.status, 200);
+  const officialNotifications = await response.json();
+  assert.ok(
+    officialNotifications.notifications.some(
+      (item) => item.type === 'status' && item.title.includes('Smoke Belediyesi'),
+    ),
+  );
 });
