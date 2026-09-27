@@ -44,6 +44,9 @@ create table if not exists issues (
   comment_count integer not null default 0 check (comment_count >= 0),
   photo_url text,
   created_by_actor text,
+  hidden_at timestamptz,
+  hidden_by_user_id text references users(id) on delete set null,
+  moderation_note text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -77,6 +80,9 @@ create table if not exists comments (
   client_id text not null,
   author_label text not null,
   body text not null check (char_length(body) between 2 and 1000),
+  hidden_at timestamptz,
+  hidden_by_user_id text references users(id) on delete set null,
+  moderation_note text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -133,6 +139,8 @@ create table if not exists moderation_reports (
   moderator_note text check (moderator_note is null or char_length(moderator_note) <= 1000),
   reviewed_by_user_id text references users(id) on delete set null,
   reviewed_at timestamptz,
+  action_taken text not null default 'none'
+    check (action_taken in ('none','hide','restore')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -151,3 +159,21 @@ alter table moderation_reports
   add column if not exists reviewed_by_user_id text references users(id) on delete set null;
 alter table moderation_reports
   add column if not exists reviewed_at timestamptz;
+
+
+alter table issues
+  add column if not exists hidden_at timestamptz;
+alter table issues
+  add column if not exists hidden_by_user_id text references users(id) on delete set null;
+alter table issues
+  add column if not exists moderation_note text;
+
+alter table comments
+  add column if not exists hidden_at timestamptz;
+alter table comments
+  add column if not exists hidden_by_user_id text references users(id) on delete set null;
+alter table comments
+  add column if not exists moderation_note text;
+
+alter table moderation_reports
+  add column if not exists action_taken text not null default 'none';
