@@ -1,9 +1,12 @@
+import { IssueAuthorityCard } from './IssueAuthorityCard';
 import { IssueCommunity } from './IssueCommunity';
 import { IssueTimeline } from './IssueTimeline';
 import type {
   Issue,
+  IssueAuthority,
   IssueCommunitySnapshot,
   IssueHistoryEvent,
+  IssueStatus,
   ResolutionFeedbackValue,
 } from '../types';
 
@@ -18,10 +21,17 @@ interface IssueSheetProps {
   communityLoading: boolean;
   history: IssueHistoryEvent[];
   historyLoading: boolean;
+  authority: IssueAuthority | null;
+  authorityLoading: boolean;
   onAddComment: (issueId: string, body: string) => Promise<void>;
   onResolutionFeedback: (
     issueId: string,
     feedback: ResolutionFeedbackValue,
+  ) => Promise<void>;
+  onOfficialStatusUpdate: (
+    issueId: string,
+    status: Extract<IssueStatus, 'İşlemde' | 'Çözüldü'>,
+    note: string,
   ) => Promise<void>;
   onReportIssue: (issue: Issue) => void;
   onReportComment: (commentId: string, label: string) => void;
@@ -45,8 +55,11 @@ export function IssueSheet({
   communityLoading,
   history,
   historyLoading,
+  authority,
+  authorityLoading,
   onAddComment,
   onResolutionFeedback,
+  onOfficialStatusUpdate,
   onReportIssue,
   onReportComment,
 }: IssueSheetProps) {
@@ -89,6 +102,14 @@ export function IssueSheet({
           <span className={`progress-dot ${stage >= 3 ? 'done' : ''}`} />
         </div>
         <div className="progress-labels"><span>Bildirildi</span><span>Doğrulandı</span><span>İşlemde</span><span>Çözüldü</span></div>
+
+        <IssueAuthorityCard
+          issue={issue}
+          authority={authority}
+          loading={authorityLoading}
+          onStatusUpdate={onOfficialStatusUpdate}
+        />
+
         <div className="issue-actions">
           <button
             className={`secondary-btn follow-btn ${followed ? 'active' : ''}`}
