@@ -261,6 +261,26 @@ IndexedDB modunda frontend data URL saklar. Canlı API modunda `ApiIssueReposito
 
 1. E-posta/telefon doğrulama, parola sıfırlama ve güvenli hesap kurtarma.
 2. Dağıtık rate limiting / abuse prevention; mevcut limiter tek process içindir.
-3. Moderasyon, yorum şikâyeti ve kullanıcı engelleme akışları.
+3. Moderasyon yaptırım politikası: içerik gizleme/silme, kullanıcı engelleme, itiraz ve audit görünürlüğü.
 4. Kurum hesabı için ayrı yetki modeli; vatandaş endpoint'leri kurumsal statü değiştiremez.
 5. Yedekleme/restore politikası, gözlemlenebilirlik ve production tile/geocoding kapasite planı.
+
+
+## Moderasyon
+
+### POST /v1/moderation/reports
+
+Giriş yapmış vatandaş sorun veya yorum hedefi için rapor açar. Desteklenen nedenler:
+`false_information`, `harassment`, `personal_info`, `spam`, `other`.
+
+Aynı kullanıcı aynı hedef için `open/reviewing` durumda ikinci rapor açamaz.
+
+### GET /v1/moderation/reports?status=open
+
+Yalnız `moderator/admin`. `open`, `reviewing`, `resolved`, `dismissed` veya `all` filtreleri kullanılabilir. Raporlayan kullanıcı ve hedef önizlemesi döndürülür.
+
+### PATCH /v1/moderation/reports/:id
+
+Yalnız `moderator/admin`. Durum `reviewing`, `resolved` veya `dismissed` yapılabilir ve en fazla 1000 karakter moderatör notu eklenebilir. İnceleyen kullanıcı ve zaman audit alanlarında saklanır.
+
+Bu aşamada moderasyon kararı içeriği otomatik silmez/gizlemez; rapor durumu ile içerik yaptırımı bilinçli olarak ayrı tutulur.
