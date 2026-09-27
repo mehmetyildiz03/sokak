@@ -21,6 +21,7 @@ v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katman
 - Topluluk çözüm sinyali kurumsal durumu otomatik değiştirmez; gerçek kurum hesabı/entegrasyonu ayrı tutulur
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
 - Sorun detay bottom-sheet'i
+- Gerçek **süreç geçmişi**: bildirim oluşturulması ve statü değişimleri `status_history` üzerinden kronolojik timeline olarak gösterilir
 - İdempotent “Ben de gördüm” doğrulaması
 - Dört adımlı sorun bildirme akışı
 - Sorun konumunu mini haritada sürüklenebilir pinle veya haritaya dokunarak hassas seçme
