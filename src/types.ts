@@ -77,6 +77,18 @@ export interface IssueHistoryEvent {
   fromStatus: IssueStatus | null;
   toStatus: IssueStatus;
   actorType: 'system' | 'citizen' | 'official' | 'moderator';
+  actorLabel?: string | null;
   note: string | null;
   createdAt: string;
+}
+
+
+export interface IssueAuthority {
+  id: string;
+  name: string;
+  slug: string;
+  kind: 'municipality' | 'utility' | 'other';
+  verifiedAt: string;
+  assignedAt: string;
+  canUpdateStatus: boolean;
 }
