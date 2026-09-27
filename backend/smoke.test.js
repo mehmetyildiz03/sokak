@@ -102,6 +102,17 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   assert.equal(confirmation.issue.status, 'Doğrulandı');
   assert.equal(confirmation.issue.confirms, 2);
 
+  response = await fetch(`${baseUrl}/v1/issues/${created.id}/history`);
+  assert.equal(response.status, 200);
+  const history = await response.json();
+  assert.equal(history.events.length, 2);
+  assert.equal(history.events[0].fromStatus, null);
+  assert.equal(history.events[0].toStatus, 'Yeni');
+  assert.equal(history.events[1].fromStatus, 'Yeni');
+  assert.equal(history.events[1].toStatus, 'Doğrulandı');
+  assert.equal(Object.hasOwn(history.events[0], 'actorId'), false);
+  assert.equal(Object.hasOwn(history.events[1], 'actorId'), false);
+
   response = await fetch(`${baseUrl}/v1/issues/${created.id}/follow`, {
     method: 'PUT',
     headers: headersB,
