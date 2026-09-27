@@ -2126,3 +2126,41 @@ button:disabled { cursor: default; }
     box-shadow: 0 18px 55px rgba(27,48,70,.16);
   }
 }
+
+.moderation-review-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+}
+.moderation-review-title-row .moderation-review-reason {
+  margin-top: 0;
+}
+.moderation-hidden-chip {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: #fff0ed;
+  color: #99493d;
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.moderation-review-actions button.hide-target {
+  border-color: rgba(180,77,61,.2);
+  background: #fff0ed;
+  color: #914639;
+}
+.moderation-restore-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 1px solid rgba(20,92,104,.22);
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 850;
+}
