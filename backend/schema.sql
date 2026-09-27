@@ -71,6 +71,7 @@ create table if not exists issues (
     check (status in ('Yeni','Doğrulandı','Uzun süredir açık','İşlemde','Çözüldü')),
   confirmation_count integer not null default 1 check (confirmation_count >= 0),
   comment_count integer not null default 0 check (comment_count >= 0),
+  last_comment_at timestamptz,
   photo_url text,
   created_by_actor text,
   hidden_at timestamptz,
@@ -259,3 +260,18 @@ create index if not exists notifications_recipient_unread_idx
 
 alter table status_history
   add column if not exists organization_id text references organizations(id) on delete set null;
+
+
+alter table issues
+  add column if not exists last_comment_at timestamptz;
+
+update issues i
+set last_comment_at = latest.last_comment_at
+from (
+  select issue_id, max(created_at) as last_comment_at
+  from comments
+  where hidden_at is null
+  group by issue_id
+) latest
+where i.id = latest.issue_id
+  and (i.last_comment_at is null or i.last_comment_at < latest.last_comment_at);
