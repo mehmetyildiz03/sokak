@@ -173,3 +173,26 @@ export function validateModerationReport(payload) {
     },
   };
 }
+
+
+export function validateModerationReview(payload) {
+  const status = payload?.status;
+  const moderatorNote = typeof payload?.moderatorNote === 'string'
+    ? payload.moderatorNote.trim()
+    : '';
+
+  if (!['reviewing', 'resolved', 'dismissed'].includes(status)) {
+    return { ok: false, message: 'Moderasyon durumu geçersiz.' };
+  }
+  if (moderatorNote.length > 1000) {
+    return { ok: false, message: 'Moderatör notu en fazla 1000 karakter olabilir.' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      status,
+      moderatorNote: moderatorNote || null,
+    },
+  };
+}
