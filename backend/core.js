@@ -139,3 +139,37 @@ export function rowToComment(row) {
     createdAt: new Date(row.created_at).toISOString(),
   };
 }
+
+
+export function validateModerationReport(payload) {
+  const targetType = payload?.targetType;
+  const targetId = typeof payload?.targetId === 'string' ? payload.targetId.trim() : '';
+  const reason = payload?.reason;
+  const note = typeof payload?.note === 'string' ? payload.note.trim() : '';
+
+  if (targetType !== 'issue' && targetType !== 'comment') {
+    return { ok: false, message: 'Rapor hedefi geçersiz.' };
+  }
+  if (!/^[a-zA-Z0-9:_-]{3,160}$/.test(targetId)) {
+    return { ok: false, message: 'Rapor hedefi geçersiz.' };
+  }
+  if (!['false_information', 'harassment', 'personal_info', 'spam', 'other'].includes(reason)) {
+    return { ok: false, message: 'Rapor nedeni geçersiz.' };
+  }
+  if (note.length > 500) {
+    return { ok: false, message: 'Açıklama en fazla 500 karakter olabilir.' };
+  }
+  if (reason === 'other' && note.length < 5) {
+    return { ok: false, message: 'Diğer nedeni için kısa bir açıklama ekle.' };
+  }
+
+  return {
+    ok: true,
+    value: {
+      targetType,
+      targetId,
+      reason,
+      note: note || null,
+    },
+  };
+}
