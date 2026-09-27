@@ -27,6 +27,35 @@ create table if not exists sessions (
 create index if not exists sessions_user_idx on sessions(user_id);
 create index if not exists sessions_expiry_idx on sessions(expires_at);
 
+create table if not exists organizations (
+  id text primary key,
+  name text not null,
+  slug text not null unique,
+  kind text not null check (kind in ('municipality','utility','other')),
+  verified_at timestamptz,
+  created_by_user_id text references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists organizations_verified_idx
+  on organizations(verified_at)
+  where verified_at is not null;
+
+create table if not exists organization_memberships (
+  organization_id text not null references organizations(id) on delete cascade,
+  user_id text not null references users(id) on delete cascade,
+  role text not null check (role in ('official','org_admin')),
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (organization_id, user_id)
+);
+
+create index if not exists organization_memberships_user_idx
+  on organization_memberships(user_id)
+  where active = true;
+
 create table if not exists issues (
   id text primary key,
   category text not null check (category in ('road','light','trash','sidewalk','water','park')),
@@ -55,6 +84,18 @@ create index if not exists issues_status_idx on issues(status);
 create index if not exists issues_category_idx on issues(category);
 create index if not exists issues_created_at_idx on issues(created_at desc);
 create index if not exists issues_lat_lng_idx on issues(latitude, longitude);
+
+create table if not exists issue_assignments (
+  issue_id text primary key references issues(id) on delete cascade,
+  organization_id text not null references organizations(id) on delete restrict,
+  assigned_by_user_id text references users(id) on delete set null,
+  assigned_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists issue_assignments_organization_idx
+  on issue_assignments(organization_id);
+
 
 create table if not exists confirmations (
   issue_id text not null references issues(id) on delete cascade,
@@ -108,6 +149,7 @@ create table if not exists status_history (
   to_status text not null,
   actor_type text not null check (actor_type in ('system','citizen','official','moderator')),
   actor_id text,
+  organization_id text references organizations(id) on delete set null,
   note text,
   created_at timestamptz not null default now()
 );
@@ -213,3 +255,7 @@ create index if not exists notifications_recipient_created_idx
 create index if not exists notifications_recipient_unread_idx
   on notifications(recipient_actor, read_at)
   where read_at is null;
+
+
+alter table status_history
+  add column if not exists organization_id text references organizations(id) on delete set null;
