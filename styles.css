@@ -2765,3 +2765,19 @@ button:disabled { cursor: default; }
     grid-template-columns: repeat(2,minmax(0,1fr));
   }
 }
+
+.legend-comment-badge {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: #145c68;
+  color: #fff;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 1px 4px rgba(15,79,89,.2);
+}
