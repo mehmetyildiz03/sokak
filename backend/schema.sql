@@ -195,3 +195,21 @@ create table if not exists moderation_actions (
 
 create index if not exists moderation_actions_report_created_idx
   on moderation_actions(report_id, created_at);
+
+
+create table if not exists notifications (
+  id text primary key,
+  recipient_actor text not null,
+  issue_id text references issues(id) on delete cascade,
+  type text not null check (type in ('comment','status','moderation')),
+  title text not null,
+  body text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists notifications_recipient_created_idx
+  on notifications(recipient_actor, created_at desc);
+create index if not exists notifications_recipient_unread_idx
+  on notifications(recipient_actor, read_at)
+  where read_at is null;
