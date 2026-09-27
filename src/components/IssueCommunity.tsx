@@ -15,6 +15,7 @@ interface IssueCommunityProps {
     issueId: string,
     feedback: ResolutionFeedbackValue,
   ) => Promise<void>;
+  onReportComment: (commentId: string, label: string) => void;
 }
 
 export function IssueCommunity({
@@ -23,6 +24,7 @@ export function IssueCommunity({
   loading,
   onAddComment,
   onResolutionFeedback,
+  onReportComment,
 }: IssueCommunityProps) {
   const [comment, setComment] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
@@ -131,6 +133,13 @@ export function IssueCommunity({
                   <span>{formatIssueAge(item.createdAt, 'şimdi')}</span>
                 </div>
                 <p>{item.body}</p>
+                <button
+                  type="button"
+                  className="comment-report-link"
+                  onClick={() => onReportComment(item.id, `${item.authorLabel}: ${item.body.slice(0, 70)}`)}
+                >
+                  Bildir
+                </button>
               </div>
             </article>
           ))}
