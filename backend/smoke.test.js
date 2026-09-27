@@ -152,4 +152,81 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   assert.equal(community.resolution.resolvedCount, 1);
   assert.equal(community.resolution.stillOpenCount, 1);
   assert.equal(community.resolution.myFeedback, 'still_open');
+
+  const username = `smoke_user_${Date.now()}`;
+  response = await fetch(`${baseUrl}/v1/auth/register`, {
+    method: 'POST',
+    headers: headersB,
+    body: JSON.stringify({
+      username,
+      displayName: 'Smoke Kullanıcısı',
+      password: 'smoke-test-password-123',
+    }),
+  });
+  assert.equal(response.status, 201);
+  const registered = await response.json();
+  assert.equal(registered.user.username, username);
+  assert.equal(registered.user.displayName, 'Smoke Kullanıcısı');
+  assert.ok(registered.token);
+
+  response = await fetch(`${baseUrl}/v1/auth/claim-device`, {
+    method: 'POST',
+    headers: {
+      ...headersB,
+      Authorization: `Bearer ${registered.token}`,
+    },
+  });
+  assert.equal(response.status, 200);
+
+  const secondDeviceId = `smoke-c-${Date.now()}`;
+  const secondDeviceHeaders = {
+    'Content-Type': 'application/json',
+    'X-Sokak-Client-Id': secondDeviceId,
+    Authorization: `Bearer ${registered.token}`,
+  };
+
+  response = await fetch(`${baseUrl}/v1/me/follows`, {
+    headers: secondDeviceHeaders,
+  });
+  const accountFollows = await response.json();
+  assert.ok(accountFollows.issueIds.includes(created.id));
+
+  response = await fetch(`${baseUrl}/v1/issues/${created.id}/comments`, {
+    method: 'POST',
+    headers: secondDeviceHeaders,
+    body: JSON.stringify({ body: 'Hesapla eklenen topluluk güncellemesi.' }),
+  });
+  assert.equal(response.status, 201);
+  const accountComment = await response.json();
+  assert.equal(accountComment.authorLabel, 'Smoke Kullanıcısı');
+
+  const thirdDeviceId = `smoke-d-${Date.now()}`;
+  response = await fetch(`${baseUrl}/v1/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sokak-Client-Id': thirdDeviceId,
+    },
+    body: JSON.stringify({
+      username,
+      password: 'smoke-test-password-123',
+    }),
+  });
+  assert.equal(response.status, 200);
+  const login = await response.json();
+  assert.notEqual(login.token, registered.token);
+
+  response = await fetch(`${baseUrl}/v1/auth/me`, {
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Sokak-Client-Id': thirdDeviceId,
+      Authorization: `Bearer ${login.token}`,
+    },
+  });
+  assert.equal(response.status, 200);
+  const me = await response.json();
+  assert.equal(me.user.username, username);
+  assert.ok(me.user.stats.confirmations >= 1);
+  assert.ok(me.user.stats.follows >= 1);
+  assert.ok(me.user.stats.comments >= 2);
 });
