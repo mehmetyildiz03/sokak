@@ -261,6 +261,132 @@ async function withTransaction(work) {
 }
 
 
+async function createNotification(queryable, {
+  recipientActor,
+  issueId = null,
+  type,
+  title,
+  body,
+}) {
+  if (!recipientActor) return;
+
+  await queryable.query(
+    `insert into notifications (
+      id, recipient_actor, issue_id, type, title, body
+    ) values ($1,$2,$3,$4,$5,$6)`,
+    [
+      `ntf-${randomUUID()}`,
+      recipientActor,
+      issueId,
+      type,
+      title,
+      body,
+    ],
+  );
+}
+
+async function notifyIssueParticipants(
+  queryable,
+  issue,
+  excludeActor,
+  type,
+  title,
+  body,
+) {
+  const recipients = await queryable.query(
+    `select client_id as actor_id
+     from follows
+     where issue_id = $1
+     union
+     select created_by_actor as actor_id
+     from issues
+     where id = $1 and created_by_actor is not null`,
+    [issue.id],
+  );
+
+  for (const row of recipients.rows) {
+    if (!row.actor_id || row.actor_id === excludeActor) continue;
+    await createNotification(queryable, {
+      recipientActor: row.actor_id,
+      issueId: issue.id,
+      type,
+      title,
+      body,
+    });
+  }
+}
+
+async function handleGetNotifications(req, res, origin, url) {
+  const actor = await resolveActor(req);
+  const requestedLimit = Number(url.searchParams.get('limit') ?? 50);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(100, Math.trunc(requestedLimit)))
+    : 50;
+
+  const [items, unread] = await Promise.all([
+    pool.query(
+      `select id, issue_id, type, title, body, read_at, created_at
+       from notifications
+       where recipient_actor = $1
+       order by created_at desc
+       limit $2`,
+      [actor.actorId, limit],
+    ),
+    pool.query(
+      `select count(*)::int as count
+       from notifications
+       where recipient_actor = $1 and read_at is null`,
+      [actor.actorId],
+    ),
+  ]);
+
+  sendJson(res, 200, {
+    unreadCount: Number(unread.rows[0]?.count ?? 0),
+    notifications: items.rows.map((row) => ({
+      id: row.id,
+      issueId: row.issue_id,
+      type: row.type,
+      title: row.title,
+      body: row.body,
+      readAt: row.read_at ? new Date(row.read_at).toISOString() : null,
+      createdAt: new Date(row.created_at).toISOString(),
+    })),
+  }, origin);
+}
+
+async function handleReadNotification(req, res, origin, notificationId) {
+  const actor = await resolveActor(req);
+  const result = await pool.query(
+    `update notifications
+     set read_at = coalesce(read_at, now())
+     where id = $1 and recipient_actor = $2
+     returning id, read_at`,
+    [notificationId, actor.actorId],
+  );
+
+  if (result.rowCount === 0) {
+    sendJson(res, 404, { message: 'Bildirim bulunamadı.' }, origin);
+    return;
+  }
+
+  sendJson(res, 200, {
+    id: result.rows[0].id,
+    readAt: new Date(result.rows[0].read_at).toISOString(),
+  }, origin);
+}
+
+async function handleReadAllNotifications(req, res, origin) {
+  const actor = await resolveActor(req);
+  const result = await pool.query(
+    `update notifications
+     set read_at = now()
+     where recipient_actor = $1 and read_at is null`,
+    [actor.actorId],
+  );
+
+  sendJson(res, 200, { updated: result.rowCount ?? 0 }, origin);
+}
+
 async function createSessionForUser(queryable, userId) {
   const token = createSessionToken();
   await queryable.query(
@@ -424,6 +550,13 @@ async function handleClaimDevice(req, res, origin) {
       `update issues
        set created_by_actor = $2
        where created_by_actor = $1`,
+      [clientId, userActorId],
+    );
+
+    await client.query(
+      `update notifications
+       set recipient_actor = $2
+       where recipient_actor = $1`,
       [clientId, userActorId],
     );
   });
@@ -669,6 +802,15 @@ async function handleConfirmation(req, res, origin, issueId) {
           'Topluluk doğrulama eşiği nedeniyle durum güncellendi.',
         ],
       );
+
+      await notifyIssueParticipants(
+        client,
+        issue,
+        clientId,
+        'status',
+        'Sorun topluluk tarafından doğrulandı',
+        `“${issue.title}” topluluk doğrulama eşiğine ulaştı.`,
+      );
     }
 
     return { row: updated.rows[0], alreadyConfirmed: false };
@@ -727,6 +869,15 @@ async function handleAddComment(req, res, origin, issueId) {
        set comment_count = comment_count + 1, updated_at = now()
        where id = $1`,
       [issueId],
+    );
+
+    await notifyIssueParticipants(
+      client,
+      issue,
+      clientId,
+      'comment',
+      'Yeni topluluk güncellemesi',
+      `${actor.authorLabel}, “${issue.title}” kaydına yeni bir topluluk güncellemesi ekledi.`,
     );
 
     return rowToComment(inserted.rows[0]);
@@ -1076,6 +1227,41 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
       }
     }
 
+    if (contentAction === 'hide' || contentAction === 'restore') {
+      const tableName = report.target_type === 'issue'
+        ? 'issues'
+        : report.target_type === 'comment'
+          ? 'comments'
+          : null;
+
+      if (tableName) {
+        const ownerResult = await client.query(
+          tableName === 'issue'
+            ? `select created_by_actor as actor_id, id as issue_id
+               from issues where id = $1`
+            : `select client_id as actor_id, issue_id
+               from comments where id = $1`,
+          [report.target_id],
+        );
+        const owner = ownerResult.rows[0];
+        const moderatorActor = `user:${moderator.id}`;
+
+        if (owner?.actor_id && owner.actor_id !== moderatorActor) {
+          await createNotification(client, {
+            recipientActor: owner.actor_id,
+            issueId: owner.issue_id ?? null,
+            type: 'moderation',
+            title: contentAction === 'hide'
+              ? 'İçerik moderasyon nedeniyle gizlendi'
+              : 'İçerik yeniden görünür hale getirildi',
+            body: contentAction === 'hide'
+              ? 'Paylaştığın içerik topluluk güvenliği incelemesi sonucunda haritadan gizlendi.'
+              : 'Paylaştığın içerik moderasyon incelemesi sonrası yeniden görünür hale getirildi.',
+          });
+        }
+      }
+    }
+
     await client.query(
       `insert into moderation_actions (
         id, report_id, moderator_user_id, previous_status,
@@ -1216,6 +1402,21 @@ async function route(req, res) {
   }
   if (req.method === 'GET' && path === '/v1/me/follows') {
     await handleGetMyFollows(req, res, origin);
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/v1/me/notifications') {
+    await handleGetNotifications(req, res, origin, url);
+    return;
+  }
+  if (req.method === 'POST' && path === '/v1/me/notifications/read-all') {
+    await handleReadAllNotifications(req, res, origin);
+    return;
+  }
+
+  let notificationMatch = path.match(/^\/v1\/me\/notifications\/([^/]+)\/read$/);
+  if (notificationMatch && req.method === 'PUT') {
+    await handleReadNotification(req, res, origin, decodeId(notificationMatch[1]));
     return;
   }
 
