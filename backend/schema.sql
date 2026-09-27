@@ -130,6 +130,9 @@ create table if not exists moderation_reports (
   note text check (note is null or char_length(note) <= 500),
   status text not null default 'open'
     check (status in ('open','reviewing','resolved','dismissed')),
+  moderator_note text check (moderator_note is null or char_length(moderator_note) <= 1000),
+  reviewed_by_user_id text references users(id) on delete set null,
+  reviewed_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -140,3 +143,11 @@ create index if not exists moderation_reports_status_created_idx
 create unique index if not exists moderation_reports_open_unique_idx
   on moderation_reports(reporter_user_id, target_type, target_id)
   where status in ('open','reviewing');
+
+
+alter table moderation_reports
+  add column if not exists moderator_note text;
+alter table moderation_reports
+  add column if not exists reviewed_by_user_id text references users(id) on delete set null;
+alter table moderation_reports
+  add column if not exists reviewed_at timestamptz;
