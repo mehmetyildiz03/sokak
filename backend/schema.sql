@@ -117,3 +117,26 @@ create index if not exists status_history_issue_created_idx
 
 alter table issues
   add column if not exists created_by_actor text;
+
+
+create table if not exists moderation_reports (
+  id text primary key,
+  reporter_user_id text not null references users(id) on delete cascade,
+  target_type text not null check (target_type in ('issue','comment')),
+  target_id text not null,
+  reason text not null check (
+    reason in ('false_information','harassment','personal_info','spam','other')
+  ),
+  note text check (note is null or char_length(note) <= 500),
+  status text not null default 'open'
+    check (status in ('open','reviewing','resolved','dismissed')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists moderation_reports_status_created_idx
+  on moderation_reports(status, created_at);
+
+create unique index if not exists moderation_reports_open_unique_idx
+  on moderation_reports(reporter_user_id, target_type, target_id)
+  where status in ('open','reviewing');
