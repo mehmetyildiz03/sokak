@@ -374,4 +374,12 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
     auditRows.rows.map((row) => row.content_action),
     ['none', 'hide', 'restore'],
   );
+
+  response = await fetch(`${baseUrl}/v1/me/notifications`, { headers: headersA });
+  assert.equal(response.status, 200);
+  const moderationNotifications = await response.json();
+  assert.ok(
+    moderationNotifications.notifications.filter((item) => item.type === 'moderation').length >= 2,
+  );
+  assert.ok(moderationNotifications.unreadCount >= 2);
 });
