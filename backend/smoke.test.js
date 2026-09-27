@@ -274,4 +274,45 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
     }),
   });
   assert.equal(response.status, 401);
+
+  // moderation queue requires moderator role
+  response = await fetch(`${baseUrl}/v1/moderation/reports?status=open`, {
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+  });
+  assert.equal(response.status, 403);
+
+  const moderationDb = new Pool({ connectionString: databaseUrl });
+  await moderationDb.query(
+    `update users set role = 'moderator', updated_at = now() where id = $1`,
+    [registered.user.id],
+  );
+  await moderationDb.end();
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports?status=open`, {
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+  });
+  assert.equal(response.status, 200);
+  const queue = await response.json();
+  assert.ok(queue.reports.some((item) => item.id === moderation.id));
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports/${moderation.id}`, {
+    method: 'PATCH',
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+    body: JSON.stringify({
+      status: 'reviewing',
+      moderatorNote: 'Smoke test incelemesi.',
+    }),
+  });
+  assert.equal(response.status, 200);
+  const reviewed = await response.json();
+  assert.equal(reviewed.status, 'reviewing');
 });
