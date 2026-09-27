@@ -9,6 +9,7 @@ interface ProfilePanelProps {
   onLogout: () => Promise<void>;
   onClaimDevice: () => Promise<void>;
   onOpenModeration: () => void;
+  onOpenAdminInstitutions: () => void;
 }
 
 export function ProfilePanel({
@@ -19,6 +20,7 @@ export function ProfilePanel({
   onLogout,
   onClaimDevice,
   onOpenModeration,
+  onOpenAdminInstitutions,
 }: ProfilePanelProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
@@ -87,6 +89,21 @@ export function ProfilePanel({
               onClick={onOpenModeration}
             >
               Kuyruğu aç
+            </button>
+          </div>
+        )}
+
+        {user.role === 'admin' && (
+          <div className="profile-admin-card">
+            <span className="eyebrow">Kurum yönetimi</span>
+            <strong>Doğrulanmış kurumlar</strong>
+            <p>Kurum oluştur, kullanıcı yetkilendir ve sorunları doğru kuruma ata.</p>
+            <button
+              type="button"
+              className="profile-primary"
+              onClick={onOpenAdminInstitutions}
+            >
+              Kurum yönetimini aç
             </button>
           </div>
         )}
