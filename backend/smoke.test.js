@@ -313,6 +313,49 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
     }),
   });
   assert.equal(response.status, 200);
-  const reviewed = await response.json();
+  let reviewed = await response.json();
   assert.equal(reviewed.status, 'reviewing');
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports/${moderation.id}`, {
+    method: 'PATCH',
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+    body: JSON.stringify({
+      status: 'resolved',
+      contentAction: 'hide',
+      moderatorNote: 'Smoke test: hedef gizlendi.',
+    }),
+  });
+  assert.equal(response.status, 200);
+  reviewed = await response.json();
+  assert.equal(reviewed.status, 'resolved');
+  assert.equal(reviewed.actionTaken, 'hide');
+  assert.equal(reviewed.targetHidden, true);
+
+  response = await fetch(`${baseUrl}/v1/issues`);
+  let publicIssues = await response.json();
+  assert.equal(publicIssues.some((item) => item.id === created.id), false);
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports/${moderation.id}`, {
+    method: 'PATCH',
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+    body: JSON.stringify({
+      status: 'resolved',
+      contentAction: 'restore',
+      moderatorNote: 'Smoke test: hedef geri açıldı.',
+    }),
+  });
+  assert.equal(response.status, 200);
+  reviewed = await response.json();
+  assert.equal(reviewed.actionTaken, 'restore');
+  assert.equal(reviewed.targetHidden, false);
+
+  response = await fetch(`${baseUrl}/v1/issues`);
+  publicIssues = await response.json();
+  assert.equal(publicIssues.some((item) => item.id === created.id), true);
 });
