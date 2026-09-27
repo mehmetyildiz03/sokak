@@ -18,6 +18,7 @@ import {
   registerAccount,
 } from './data/authApi';
 import { getStoredAuthSession, setStoredAuthSession } from './data/authSession';
+import { getIssueHistory } from './data/issueHistoryApi';
 import { listNotifications } from './data/notificationsApi';
 import {
   submitModerationReport,
@@ -35,6 +36,7 @@ import type {
   Issue,
   IssueComment,
   IssueCommunitySnapshot,
+  IssueHistoryEvent,
   MapMode,
   Point,
   ReportDraft,
@@ -76,6 +78,8 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [communityByIssueId, setCommunityByIssueId] = useState<Record<string, IssueCommunitySnapshot>>({});
   const [communityLoadingIssueId, setCommunityLoadingIssueId] = useState<string | null>(null);
+  const [historyByIssueId, setHistoryByIssueId] = useState<Record<string, IssueHistoryEvent[]>>({});
+  const [historyLoadingIssueId, setHistoryLoadingIssueId] = useState<string | null>(null);
   const [authUser, setAuthUser] = useState<UserProfile | null>(
     () => getStoredAuthSession()?.user ?? null,
   );
@@ -232,6 +236,36 @@ export default function App() {
       cancelled = true;
     };
   }, [repository, selectedIssueId]);
+
+  useEffect(() => {
+    if (!selectedIssueId || !sharedBackendEnabled) return;
+
+    let cancelled = false;
+    setHistoryLoadingIssueId(selectedIssueId);
+
+    void getIssueHistory(selectedIssueId)
+      .then((events) => {
+        if (cancelled) return;
+        setHistoryByIssueId((current) => ({
+          ...current,
+          [selectedIssueId]: events,
+        }));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHistoryByIssueId((current) => ({
+          ...current,
+          [selectedIssueId]: current[selectedIssueId] ?? [],
+        }));
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoadingIssueId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIssueId]);
 
   const requestLocation = (): Promise<Point> => new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
@@ -834,6 +868,8 @@ export default function App() {
           onToggleFollow={(id) => void toggleFollow(id)}
           community={selectedIssue ? communityByIssueId[selectedIssue.id] ?? null : null}
           communityLoading={selectedIssue ? communityLoadingIssueId === selectedIssue.id : false}
+          history={selectedIssue ? historyByIssueId[selectedIssue.id] ?? [] : []}
+          historyLoading={selectedIssue ? historyLoadingIssueId === selectedIssue.id : false}
           onAddComment={addCommunityComment}
           onResolutionFeedback={setCommunityResolutionFeedback}
           onReportIssue={(issue) => openModerationReport('issue', issue.id, issue.title)}
