@@ -8,6 +8,7 @@ import {
   type Map as MapLibreMap,
   type MapLayerMouseEvent,
 } from 'maplibre-gl';
+import { getIssueMapActivity } from '../data/mapActivity';
 import type { Issue, MapMode, Point } from '../types';
 
 interface MapViewProps {
@@ -34,31 +35,42 @@ function applyMapMode(map: MapLibreMap, mode: MapMode) {
   setLayerVisibility(map, 'issue-cluster-count', mode === 'issues');
   setLayerVisibility(map, 'issue-halo', showIssuePoints);
   setLayerVisibility(map, 'issue-points', showIssuePoints);
+  setLayerVisibility(map, 'issue-recent-report-ring', showIssuePoints);
+  setLayerVisibility(map, 'issue-comment-badge', showIssuePoints);
+  setLayerVisibility(map, 'issue-comment-count', showIssuePoints);
 }
 
 function makeGeoJson(issues: Issue[], followedIssueIds: string[]) {
   const followed = new Set(followedIssueIds);
+  const nowMs = Date.now();
 
   return {
     type: 'FeatureCollection' as const,
-    features: issues.map((issue) => ({
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [issue.lng, issue.lat] },
-      properties: {
-        id: issue.id,
-        status: issue.status,
-        severity: issue.severity,
-        confirms: issue.confirms,
-        category: issue.category,
-        followed: followed.has(issue.id) ? 1 : 0,
-        heatWeight: issue.status === 'Çözüldü' ? 0 : Math.min(
-          1,
-          (issue.severity / 3) * 0.55 +
-          Math.min(0.3, Math.log2(issue.confirms + 1) / 16) +
-          (issue.status === 'Uzun süredir açık' ? 0.15 : 0),
-        ),
-      },
-    })),
+    features: issues.map((issue) => {
+      const activity = getIssueMapActivity(issue, nowMs);
+
+      return {
+        type: 'Feature' as const,
+        geometry: { type: 'Point' as const, coordinates: [issue.lng, issue.lat] },
+        properties: {
+          id: issue.id,
+          status: issue.status,
+          severity: issue.severity,
+          confirms: issue.confirms,
+          comments: issue.comments,
+          category: issue.category,
+          followed: followed.has(issue.id) ? 1 : 0,
+          recentReport: activity.recentReport ? 1 : 0,
+          recentComment: activity.recentComment ? 1 : 0,
+          heatWeight: issue.status === 'Çözüldü' ? 0 : Math.min(
+            1,
+            (issue.severity / 3) * 0.55 +
+            Math.min(0.3, Math.log2(issue.confirms + 1) / 16) +
+            (issue.status === 'Uzun süredir açık' ? 0.15 : 0),
+          ),
+        },
+      };
+    }),
   };
 }
 
@@ -260,10 +272,14 @@ export function MapView({
 
       applyMapMode(map, modeRef.current);
 
-      map.on('click', 'issue-points', (event: MapLayerMouseEvent) => {
+      const selectIssueFromFeature = (event: MapLayerMouseEvent) => {
         const id = event.features?.[0]?.properties?.id as string | undefined;
         if (id) selectRef.current(id);
-      });
+      };
+
+      map.on('click', 'issue-points', selectIssueFromFeature);
+      map.on('click', 'issue-comment-badge', selectIssueFromFeature);
+      map.on('click', 'issue-comment-count', selectIssueFromFeature);
 
       map.on('click', 'issue-clusters', async (event: MapLayerMouseEvent) => {
         const feature = event.features?.[0];
@@ -289,7 +305,12 @@ export function MapView({
         }
       });
 
-      for (const layerId of ['issue-points', 'issue-clusters']) {
+      for (const layerId of [
+        'issue-points',
+        'issue-clusters',
+        'issue-comment-badge',
+        'issue-comment-count',
+      ]) {
         map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
         map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
       }
