@@ -1,7 +1,9 @@
 import { IssueCommunity } from './IssueCommunity';
+import { IssueTimeline } from './IssueTimeline';
 import type {
   Issue,
   IssueCommunitySnapshot,
+  IssueHistoryEvent,
   ResolutionFeedbackValue,
 } from '../types';
 
@@ -14,6 +16,8 @@ interface IssueSheetProps {
   onToggleFollow: (id: string) => void;
   community: IssueCommunitySnapshot | null;
   communityLoading: boolean;
+  history: IssueHistoryEvent[];
+  historyLoading: boolean;
   onAddComment: (issueId: string, body: string) => Promise<void>;
   onResolutionFeedback: (
     issueId: string,
@@ -39,6 +43,8 @@ export function IssueSheet({
   onToggleFollow,
   community,
   communityLoading,
+  history,
+  historyLoading,
   onAddComment,
   onResolutionFeedback,
   onReportIssue,
@@ -99,6 +105,8 @@ export function IssueSheet({
             {issue.status === 'Çözüldü' ? 'Sorun çözüldü' : confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
           </button>
         </div>
+        <IssueTimeline events={history} loading={historyLoading} />
+
         <button
           type="button"
           className="issue-report-link"
