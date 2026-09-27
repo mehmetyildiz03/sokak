@@ -204,3 +204,71 @@ export function validateModerationReview(payload) {
     },
   };
 }
+
+
+export function validateOrganizationInput(payload) {
+  const name = cleanText(payload?.name, 2, 120);
+  const rawSlug = typeof payload?.slug === 'string' ? payload.slug.trim().toLowerCase() : '';
+  const slug = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(rawSlug) ? rawSlug : null;
+  const kind = ['municipality', 'utility', 'other'].includes(payload?.kind)
+    ? payload.kind
+    : null;
+
+  if (!name || !slug || !kind) {
+    return { ok: false, message: 'Kurum bilgileri eksik veya geçersiz.' };
+  }
+
+  return { ok: true, value: { name, slug, kind } };
+}
+
+export function validateOrganizationMembershipInput(payload) {
+  const username = typeof payload?.username === 'string'
+    ? payload.username.trim().toLocaleLowerCase('tr-TR')
+    : '';
+  const role = payload?.role;
+
+  if (!/^[a-z0-9._]{3,30}$/.test(username)) {
+    return { ok: false, message: 'Kullanıcı adı geçersiz.' };
+  }
+  if (role !== 'official' && role !== 'org_admin') {
+    return { ok: false, message: 'Kurum rolü geçersiz.' };
+  }
+
+  return { ok: true, value: { username, role } };
+}
+
+export function validateIssueAssignmentInput(payload) {
+  const organizationId = typeof payload?.organizationId === 'string'
+    ? payload.organizationId.trim()
+    : '';
+
+  if (!/^org-[a-zA-Z0-9-]{8,160}$/.test(organizationId)) {
+    return { ok: false, message: 'Kurum kimliği geçersiz.' };
+  }
+
+  return { ok: true, value: { organizationId } };
+}
+
+export function validateOfficialStatusUpdate(payload) {
+  const status = payload?.status;
+  const note = cleanText(payload?.note, 5, 500);
+
+  if (status !== 'İşlemde' && status !== 'Çözüldü') {
+    return { ok: false, message: 'Kurum statüsü yalnız İşlemde veya Çözüldü olabilir.' };
+  }
+  if (!note) {
+    return { ok: false, message: 'Kurum statü güncellemesi için kısa bir açıklama gerekli.' };
+  }
+
+  return { ok: true, value: { status, note } };
+}
+
+export function isOfficialStatusTransitionAllowed(fromStatus, toStatus) {
+  if (toStatus === 'İşlemde') {
+    return ['Yeni', 'Doğrulandı', 'Uzun süredir açık', 'Çözüldü'].includes(fromStatus);
+  }
+  if (toStatus === 'Çözüldü') {
+    return fromStatus === 'İşlemde';
+  }
+  return false;
+}
