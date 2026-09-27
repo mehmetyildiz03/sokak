@@ -177,3 +177,21 @@ alter table comments
 
 alter table moderation_reports
   add column if not exists action_taken text not null default 'none';
+
+
+create table if not exists moderation_actions (
+  id text primary key,
+  report_id text not null references moderation_reports(id) on delete cascade,
+  moderator_user_id text not null references users(id) on delete restrict,
+  previous_status text not null
+    check (previous_status in ('open','reviewing','resolved','dismissed')),
+  new_status text not null
+    check (new_status in ('reviewing','resolved','dismissed')),
+  content_action text not null default 'none'
+    check (content_action in ('none','hide','restore')),
+  note text check (note is null or char_length(note) <= 1000),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists moderation_actions_report_created_idx
+  on moderation_actions(report_id, created_at);
