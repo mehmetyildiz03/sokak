@@ -70,3 +70,13 @@ export interface UserProfile {
   createdAt: string;
   stats: UserProfileStats;
 }
+
+
+export interface IssueHistoryEvent {
+  id: string;
+  fromStatus: IssueStatus | null;
+  toStatus: IssueStatus;
+  actorType: 'system' | 'citizen' | 'official' | 'moderator';
+  note: string | null;
+  createdAt: string;
+}
