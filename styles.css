@@ -2613,3 +2613,155 @@ button:disabled { cursor: default; }
 .official-status-editor button:disabled {
   opacity: .48;
 }
+
+/* Admin institution management */
+.profile-admin-card {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid rgba(70,78,140,.16);
+  border-radius: 19px;
+  background: linear-gradient(180deg,#f8f8fd,#f1f2fa);
+}
+.profile-admin-card > strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 14px;
+}
+.profile-admin-card p {
+  margin: 6px 0 13px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+.admin-institution-panel {
+  position: absolute;
+  z-index: 8;
+  inset: 0 0 calc(env(safe-area-inset-bottom) + 78px) 0;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top) + 18px) 14px 24px;
+  background:
+    radial-gradient(circle at 92% 0%, rgba(73,82,145,.09), transparent 32%),
+    linear-gradient(180deg,#f8fafc,#f1f4f8);
+}
+.admin-institution-header {
+  display: grid;
+  grid-template-columns: 42px minmax(0,1fr);
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+.admin-institution-header > button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 13px;
+  background: white;
+  color: #4f5c8c;
+  font-size: 26px;
+  box-shadow: 0 5px 15px rgba(28,43,69,.08);
+}
+.admin-institution-header h1 {
+  margin: 2px 0 0;
+  font-size: 27px;
+  line-height: 1;
+  letter-spacing: -.035em;
+}
+.admin-institution-grid {
+  display: grid;
+  gap: 11px;
+}
+.admin-card {
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 19px;
+  background: white;
+  box-shadow: 0 8px 24px rgba(28,43,69,.05);
+}
+.admin-card h2 {
+  margin: 3px 0 11px;
+  font-size: 14px;
+}
+.admin-card p,
+.admin-empty-copy {
+  margin: 0 0 11px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+.admin-card label {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+.admin-card label > span {
+  color: #596576;
+  font-size: 9px;
+  font-weight: 850;
+}
+.admin-card input,
+.admin-card select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #dfe5ec;
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: #fbfcfd;
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+}
+.admin-card input:focus,
+.admin-card select:focus {
+  border-color: rgba(73,82,145,.38);
+  outline: 3px solid rgba(73,82,145,.08);
+}
+.admin-primary {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: #52608e;
+  color: white;
+  font-size: 10px;
+  font-weight: 900;
+}
+.admin-primary:disabled {
+  opacity: .48;
+}
+.admin-org-summary {
+  margin-top: 10px;
+  padding: 11px;
+  border-radius: 13px;
+  background: #f4f6fb;
+}
+.admin-org-summary strong {
+  display: block;
+  font-size: 11px;
+}
+.admin-org-summary span,
+.admin-org-summary small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 8px;
+}
+.admin-security-note {
+  margin: 12px 2px 0;
+  color: #7b8696;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+@media (min-width: 760px) {
+  .admin-institution-panel {
+    inset: calc(env(safe-area-inset-top) + 92px) auto 92px 24px;
+    width: min(720px, calc(100vw - 48px));
+    border: 1px solid rgba(255,255,255,.85);
+    border-radius: 28px;
+    box-shadow: 0 18px 55px rgba(27,48,70,.16);
+  }
+  .admin-institution-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+}
