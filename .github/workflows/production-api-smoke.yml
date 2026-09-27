@@ -137,3 +137,29 @@ jobs:
           test "$status" = "404"
           grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
           grep -q 'Sorun kaydı bulunamadı' "$body"
+
+      - name: Official organization admin endpoint requires admin
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X POST             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-official-admin-smoke'             --data '{"name":"Smoke Kurum","slug":"production-smoke-kurum","kind":"other"}'             https://sokak-api-production.up.railway.app/v1/admin/organizations)"
+          test "$status" = "401"
+          grep -q 'Oturum açman gerekiyor' "$body"
+
+      - name: Official authority endpoint
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -D "$headers" -o "$body" -w '%{http_code}'             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'X-Sokak-Client-Id: production-official-authority-smoke'             https://sokak-api-production.up.railway.app/v1/issues/iss-production-official-smoke/authority)"
+          test "$status" = "404"
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          grep -q 'Sorun kaydı bulunamadı' "$body"
+
+      - name: Official status endpoint authenticates first
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X PATCH             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-official-status-smoke'             --data '{"status":"İşlemde","note":"Production smoke test güncellemesi."}'             https://sokak-api-production.up.railway.app/v1/issues/iss-production-official-smoke/status)"
+          test "$status" = "401"
+          grep -q 'Oturum açman gerekiyor' "$body"
