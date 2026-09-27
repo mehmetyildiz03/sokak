@@ -6,6 +6,7 @@ import { ModerationReportDialog } from './components/ModerationReportDialog';
 import { FollowPanel } from './components/FollowPanel';
 import { IssueSheet } from './components/IssueSheet';
 import { NearbyPanel } from './components/NearbyPanel';
+import { NotificationPanel } from './components/NotificationPanel';
 import { ProfilePanel } from './components/ProfilePanel';
 import { ReportFlow } from './components/ReportFlow';
 import { createIssueRepository } from './data/createIssueRepository';
@@ -17,6 +18,7 @@ import {
   registerAccount,
 } from './data/authApi';
 import { getStoredAuthSession, setStoredAuthSession } from './data/authSession';
+import { listNotifications } from './data/notificationsApi';
 import {
   submitModerationReport,
   type ModerationReportInput,
@@ -84,6 +86,8 @@ export default function App() {
     label: string;
   } | null>(null);
   const [moderationBusy, setModerationBusy] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationUnread, setNotificationUnread] = useState(0);
 
   const selectedIssue = useMemo(
     () => issues.find((issue) => issue.id === selectedIssueId) ?? null,
@@ -168,6 +172,31 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!sharedBackendEnabled) return;
+
+    let cancelled = false;
+    const refreshNotificationCount = () => {
+      void listNotifications(1)
+        .then((snapshot) => {
+          if (!cancelled) setNotificationUnread(snapshot.unreadCount);
+        })
+        .catch(() => {
+          // Keep the map usable when notification refresh is temporarily unavailable.
+        });
+    };
+
+    refreshNotificationCount();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refreshNotificationCount();
+    }, 60_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [authUser?.id, dataReloadKey]);
+
+  useEffect(() => {
     if (!selectedIssueId) return;
 
     let cancelled = false;
@@ -250,6 +279,7 @@ export default function App() {
   const openNearby = () => {
     setSelectedIssueId(null);
     setReportOpen(false);
+    setNotificationsOpen(false);
     setFilterPanelOpen(false);
     setActiveView('nearby');
 
@@ -529,15 +559,17 @@ export default function App() {
     }
   };
 
-  const openExistingIssue = (id: string) => {
+  const openExistingIssue = (id: string): boolean => {
     const issue = issues.find((item) => item.id === id);
-    if (!issue) return;
+    if (!issue) return false;
+    setNotificationsOpen(false);
     setReportOpen(false);
     setFilterPanelOpen(false);
     setActiveView('map');
     setSelectedIssueId(id);
     setMode('issues');
     setFocus({ lng: issue.lng, lat: issue.lat, key: Date.now() });
+    return true;
   };
 
   const submitReport = async (draft: ReportDraft): Promise<void> => {
@@ -664,11 +696,17 @@ export default function App() {
             <strong>Isparta · Canlı</strong>
           </button>
           <button
-            className="icon-btn"
-            onClick={() => notify('Bildirim merkezi sonraki sürümde bağlanacak.')}
-            aria-label="Bildirimler"
+            className={`icon-btn notification-trigger ${notificationsOpen ? 'active' : ''}`}
+            onClick={() => setNotificationsOpen((open) => !open)}
+            aria-label={notificationUnread > 0 ? `Bildirimler, ${notificationUnread} okunmamış` : 'Bildirimler'}
+            aria-expanded={notificationsOpen}
           >
             ♢
+            {notificationUnread > 0 && (
+              <span className="notification-badge">
+                {notificationUnread > 99 ? '99+' : notificationUnread}
+              </span>
+            )}
           </button>
         </header>
 
@@ -779,6 +817,7 @@ export default function App() {
           onClick={() => {
             setSelectedIssueId(null);
             setFilterPanelOpen(false);
+            setNotificationsOpen(false);
             setReportOpen(true);
           }}
         >
@@ -806,6 +845,7 @@ export default function App() {
             className={`nav-item ${activeView === 'map' ? 'active' : ''}`}
             onClick={() => {
               setActiveView('map');
+              setNotificationsOpen(false);
               setFilterPanelOpen(false);
               setMode('issues');
             }}
@@ -824,6 +864,7 @@ export default function App() {
             onClick={() => {
               setSelectedIssueId(null);
               setReportOpen(false);
+              setNotificationsOpen(false);
               setFilterPanelOpen(false);
               setActiveView('following');
             }}
@@ -835,6 +876,7 @@ export default function App() {
             onClick={() => {
               setSelectedIssueId(null);
               setReportOpen(false);
+              setNotificationsOpen(false);
               setFilterPanelOpen(false);
               setActiveView('profile');
             }}
@@ -843,6 +885,14 @@ export default function App() {
           </button>
         </nav>
       </section>
+
+      <NotificationPanel
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        onUnreadChange={setNotificationUnread}
+        onOpenIssue={openExistingIssue}
+        notify={notify}
+      />
 
       <ModerationReportDialog
         target={moderationTarget}
