@@ -100,6 +100,23 @@ test('moderation review validation restricts statuses and note size', () => {
 
   assert.equal(validateModerationReview({ status: 'open' }).ok, false);
   assert.equal(validateModerationReview({
+    status: 'reviewing',
+    contentAction: 'hide',
+  }).ok, false);
+  assert.equal(validateModerationReview({
+    status: 'resolved',
+    contentAction: 'hide',
+    moderatorNote: 'Kişisel bilgi içeriyor.',
+  }).ok, true);
+  assert.equal(validateModerationReview({
+    status: 'resolved',
+    contentAction: 'restore',
+  }).ok, true);
+  assert.equal(validateModerationReview({
+    status: 'resolved',
+    contentAction: 'delete',
+  }).ok, false);
+  assert.equal(validateModerationReview({
     status: 'resolved',
     moderatorNote: 'x'.repeat(1001),
   }).ok, false);
