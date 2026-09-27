@@ -1076,6 +1076,22 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
       }
     }
 
+    await client.query(
+      `insert into moderation_actions (
+        id, report_id, moderator_user_id, previous_status,
+        new_status, content_action, note
+      ) values ($1,$2,$3,$4,$5,$6,$7)`,
+      [
+        `modact-${randomUUID()}`,
+        reportId,
+        moderator.id,
+        report.status,
+        validated.value.status,
+        contentAction,
+        validated.value.moderatorNote,
+      ],
+    );
+
     const updated = await client.query(
       `update moderation_reports
        set status = $2,
