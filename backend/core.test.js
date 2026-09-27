@@ -7,6 +7,11 @@ import {
   validateIssueInput,
   validateModerationReport,
   validateModerationReview,
+  validateOrganizationInput,
+  validateOrganizationMembershipInput,
+  validateIssueAssignmentInput,
+  validateOfficialStatusUpdate,
+  isOfficialStatusTransitionAllowed,
   validateResolutionFeedback,
 } from './core.js';
 
@@ -120,4 +125,55 @@ test('moderation review validation restricts statuses and note size', () => {
     status: 'resolved',
     moderatorNote: 'x'.repeat(1001),
   }).ok, false);
+});
+
+
+test('organization and official status validation', () => {
+  const organization = validateOrganizationInput({
+    name: 'Isparta Belediyesi',
+    slug: 'isparta-belediyesi',
+    kind: 'municipality',
+  });
+  assert.equal(organization.ok, true);
+
+  assert.equal(validateOrganizationInput({
+    name: 'X',
+    slug: 'bad slug',
+    kind: 'municipality',
+  }).ok, false);
+
+  assert.equal(validateOrganizationMembershipInput({
+    username: 'official.user',
+    role: 'official',
+  }).ok, true);
+  assert.equal(validateOrganizationMembershipInput({
+    username: 'official.user',
+    role: 'owner',
+  }).ok, false);
+
+  assert.equal(validateIssueAssignmentInput({
+    organizationId: 'org-12345678',
+  }).ok, true);
+  assert.equal(validateIssueAssignmentInput({
+    organizationId: 'bad',
+  }).ok, false);
+
+  assert.equal(validateOfficialStatusUpdate({
+    status: 'İşlemde',
+    note: 'Ekip yönlendirildi.',
+  }).ok, true);
+  assert.equal(validateOfficialStatusUpdate({
+    status: 'Çözüldü',
+    note: 'ok',
+  }).ok, false);
+  assert.equal(validateOfficialStatusUpdate({
+    status: 'Yeni',
+    note: 'Geri alındı.',
+  }).ok, false);
+
+  assert.equal(isOfficialStatusTransitionAllowed('Yeni', 'İşlemde'), true);
+  assert.equal(isOfficialStatusTransitionAllowed('Doğrulandı', 'İşlemde'), true);
+  assert.equal(isOfficialStatusTransitionAllowed('İşlemde', 'Çözüldü'), true);
+  assert.equal(isOfficialStatusTransitionAllowed('Çözüldü', 'İşlemde'), true);
+  assert.equal(isOfficialStatusTransitionAllowed('Yeni', 'Çözüldü'), false);
 });
