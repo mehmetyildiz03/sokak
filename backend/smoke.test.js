@@ -230,4 +230,48 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   assert.ok(me.user.stats.confirmations >= 1);
   assert.ok(me.user.stats.follows >= 1);
   assert.ok(me.user.stats.comments >= 2);
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports`, {
+    method: 'POST',
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+    body: JSON.stringify({
+      targetType: 'issue',
+      targetId: created.id,
+      reason: 'false_information',
+      note: 'Smoke test moderasyon kaydı.',
+    }),
+  });
+  assert.equal(response.status, 201);
+  const moderation = await response.json();
+  assert.equal(moderation.targetId, created.id);
+  assert.equal(moderation.status, 'open');
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports`, {
+    method: 'POST',
+    headers: {
+      ...secondDeviceHeaders,
+      Authorization: `Bearer ${registered.token}`,
+    },
+    body: JSON.stringify({
+      targetType: 'issue',
+      targetId: created.id,
+      reason: 'spam',
+      note: 'Tekrar raporu.',
+    }),
+  });
+  assert.equal(response.status, 409);
+
+  response = await fetch(`${baseUrl}/v1/moderation/reports`, {
+    method: 'POST',
+    headers: headersA,
+    body: JSON.stringify({
+      targetType: 'issue',
+      targetId: created.id,
+      reason: 'spam',
+    }),
+  });
+  assert.equal(response.status, 401);
 });
