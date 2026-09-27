@@ -1022,6 +1022,11 @@ async function route(req, res) {
     return;
   }
 
+  if (req.method === 'GET' && path === '/v1/moderation/reports') {
+    await handleListModerationReports(req, res, origin, url);
+    return;
+  }
+
   if (req.method === 'GET' && path === '/health') {
     await pool.query('select 1');
     sendJson(res, 200, { ok: true }, origin);
