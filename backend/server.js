@@ -9,8 +9,13 @@ import {
   validateClientId,
   validateCommentBody,
   validateIssueInput,
+  validateIssueAssignmentInput,
   validateModerationReport,
   validateModerationReview,
+  validateOfficialStatusUpdate,
+  validateOrganizationInput,
+  validateOrganizationMembershipInput,
+  isOfficialStatusTransitionAllowed,
   validateResolutionFeedback,
 } from './core.js';
 import { checkStorage, decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
@@ -180,6 +185,77 @@ async function requireModerator(req) {
     throw error;
   }
   return user;
+}
+
+async function requireAdmin(req) {
+  const user = await requireAuthenticatedUser(req);
+  if (user.role !== 'admin') {
+    const error = new Error('Bu işlem için yönetici yetkisi gerekiyor.');
+    error.statusCode = 403;
+    throw error;
+  }
+  return user;
+}
+
+async function getIssueAuthority(queryable, issueId, userId = null) {
+  const result = await queryable.query(
+    `select
+       o.id,
+       o.name,
+       o.slug,
+       o.kind,
+       o.verified_at,
+       ia.assigned_at,
+       exists (
+         select 1
+         from organization_memberships om
+         where om.organization_id = o.id
+           and om.user_id = $2
+           and om.active = true
+       ) as can_update
+     from issue_assignments ia
+     join organizations o on o.id = ia.organization_id
+     where ia.issue_id = $1
+       and o.verified_at is not null
+     limit 1`,
+    [issueId, userId],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    kind: row.kind,
+    verifiedAt: new Date(row.verified_at).toISOString(),
+    assignedAt: new Date(row.assigned_at).toISOString(),
+    canUpdateStatus: Boolean(row.can_update),
+  };
+}
+
+async function requireAssignedOfficial(req, queryable, issueId) {
+  const user = await requireAuthenticatedUser(req);
+
+  if (user.role === 'admin') {
+    const authority = await getIssueAuthority(queryable, issueId, user.id);
+    if (!authority) {
+      const error = new Error('Sorun doğrulanmış bir kuruma atanmadı.');
+      error.statusCode = 409;
+      throw error;
+    }
+    return { user, authority };
+  }
+
+  const authority = await getIssueAuthority(queryable, issueId, user.id);
+  if (!authority || !authority.canUpdateStatus) {
+    const error = new Error('Bu sorun için kurum yetkin bulunmuyor.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  return { user, authority };
 }
 
 async function resolveActor(req) {
@@ -833,10 +909,18 @@ async function handleGetIssueHistory(res, origin, issueId) {
   }
 
   const result = await pool.query(
-    `select id, from_status, to_status, actor_type, note, created_at
-     from status_history
-     where issue_id = $1
-     order by created_at asc, id asc
+    `select
+       sh.id,
+       sh.from_status,
+       sh.to_status,
+       sh.actor_type,
+       sh.note,
+       sh.created_at,
+       o.name as actor_label
+     from status_history sh
+     left join organizations o on o.id = sh.organization_id
+     where sh.issue_id = $1
+     order by sh.created_at asc, sh.id asc
      limit 200`,
     [issueId],
   );
@@ -847,6 +931,7 @@ async function handleGetIssueHistory(res, origin, issueId) {
       fromStatus: row.from_status,
       toStatus: row.to_status,
       actorType: row.actor_type,
+      actorLabel: row.actor_label ?? null,
       note: row.note,
       createdAt: new Date(row.created_at).toISOString(),
     })),
@@ -1344,6 +1429,250 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
   }, origin);
 }
 
+
+async function handleCreateOrganization(req, res, origin) {
+  const admin = await requireAdmin(req);
+  const body = await readJson(req);
+  const validated = validateOrganizationInput(body);
+
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  try {
+    const id = `org-${randomUUID()}`;
+    const result = await pool.query(
+      `insert into organizations (
+        id, name, slug, kind, verified_at, created_by_user_id
+      ) values ($1,$2,$3,$4,now(),$5)
+      returning id, name, slug, kind, verified_at, created_at`,
+      [
+        id,
+        validated.value.name,
+        validated.value.slug,
+        validated.value.kind,
+        admin.id,
+      ],
+    );
+
+    const row = result.rows[0];
+    sendJson(res, 201, {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      kind: row.kind,
+      verifiedAt: new Date(row.verified_at).toISOString(),
+      createdAt: new Date(row.created_at).toISOString(),
+    }, origin);
+  } catch (error) {
+    if (error?.code === '23505') {
+      sendJson(res, 409, { message: 'Bu kurum slug değeri zaten kullanılıyor.' }, origin);
+      return;
+    }
+    throw error;
+  }
+}
+
+async function handleAddOrganizationMembership(req, res, origin, organizationId) {
+  await requireAdmin(req);
+  const body = await readJson(req);
+  const validated = validateOrganizationMembershipInput(body);
+
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const organization = await pool.query(
+    `select id from organizations
+     where id = $1 and verified_at is not null
+     limit 1`,
+    [organizationId],
+  );
+  if (organization.rowCount === 0) {
+    sendJson(res, 404, { message: 'Doğrulanmış kurum bulunamadı.' }, origin);
+    return;
+  }
+
+  const userResult = await pool.query(
+    `select id, role from users
+     where username = $1 and disabled_at is null
+     limit 1`,
+    [validated.value.username],
+  );
+  const user = userResult.rows[0];
+  if (!user) {
+    sendJson(res, 404, { message: 'Kullanıcı bulunamadı.' }, origin);
+    return;
+  }
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `insert into organization_memberships (
+        organization_id, user_id, role, active
+      ) values ($1,$2,$3,true)
+      on conflict (organization_id, user_id)
+      do update set role = excluded.role, active = true, updated_at = now()`,
+      [organizationId, user.id, validated.value.role],
+    );
+
+    if (user.role === 'citizen') {
+      await client.query(
+        `update users set role = 'official', updated_at = now() where id = $1`,
+        [user.id],
+      );
+    }
+  });
+
+  sendJson(res, 200, {
+    organizationId,
+    userId: user.id,
+    role: validated.value.role,
+    active: true,
+  }, origin);
+}
+
+async function handleAssignIssueOrganization(req, res, origin, issueId) {
+  const admin = await requireAdmin(req);
+  const body = await readJson(req);
+  const validated = validateIssueAssignmentInput(body);
+
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const [issueResult, organizationResult] = await Promise.all([
+    pool.query(
+      `select id from issues where id = $1 and hidden_at is null`,
+      [issueId],
+    ),
+    pool.query(
+      `select id, name from organizations
+       where id = $1 and verified_at is not null`,
+      [validated.value.organizationId],
+    ),
+  ]);
+
+  if (issueResult.rowCount === 0) {
+    sendJson(res, 404, { message: 'Sorun kaydı bulunamadı.' }, origin);
+    return;
+  }
+  if (organizationResult.rowCount === 0) {
+    sendJson(res, 404, { message: 'Doğrulanmış kurum bulunamadı.' }, origin);
+    return;
+  }
+
+  await pool.query(
+    `insert into issue_assignments (
+      issue_id, organization_id, assigned_by_user_id
+    ) values ($1,$2,$3)
+    on conflict (issue_id)
+    do update set
+      organization_id = excluded.organization_id,
+      assigned_by_user_id = excluded.assigned_by_user_id,
+      assigned_at = now(),
+      updated_at = now()`,
+    [issueId, validated.value.organizationId, admin.id],
+  );
+
+  sendJson(res, 200, {
+    issueId,
+    organization: {
+      id: organizationResult.rows[0].id,
+      name: organizationResult.rows[0].name,
+    },
+  }, origin);
+}
+
+async function handleGetIssueAuthority(req, res, origin, issueId) {
+  const issue = await pool.query(
+    `select id from issues where id = $1 and hidden_at is null`,
+    [issueId],
+  );
+  if (issue.rowCount === 0) {
+    sendJson(res, 404, { message: 'Sorun kaydı bulunamadı.' }, origin);
+    return;
+  }
+
+  const user = await getAuthenticatedUser(req);
+  const authority = await getIssueAuthority(pool, issueId, user?.id ?? null);
+  sendJson(res, 200, { organization: authority }, origin);
+}
+
+async function handleOfficialStatusUpdate(req, res, origin, issueId) {
+  const body = await readJson(req);
+  const validated = validateOfficialStatusUpdate(body);
+
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const result = await withTransaction(async (client) => {
+    const issue = await getIssueRow(client, issueId, { forUpdate: true });
+    if (!issue) {
+      const error = new Error('Sorun kaydı bulunamadı.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const { user, authority } = await requireAssignedOfficial(req, client, issueId);
+
+    if (!isOfficialStatusTransitionAllowed(issue.status, validated.value.status)) {
+      const error = new Error(
+        `${issue.status} durumundan ${validated.value.status} durumuna kurum geçişi izinli değil.`,
+      );
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const updated = await client.query(
+      `update issues
+       set status = $2, updated_at = now()
+       where id = $1
+       returning *`,
+      [issueId, validated.value.status],
+    );
+
+    await client.query(
+      `insert into status_history (
+        id, issue_id, from_status, to_status, actor_type,
+        actor_id, organization_id, note
+      ) values ($1,$2,$3,$4,'official',$5,$6,$7)`,
+      [
+        `hist-${randomUUID()}`,
+        issueId,
+        issue.status,
+        validated.value.status,
+        user.id,
+        authority.id,
+        validated.value.note,
+      ],
+    );
+
+    await notifyIssueParticipants(
+      client,
+      issue,
+      `user:${user.id}`,
+      'status',
+      `${authority.name} durumu güncelledi`,
+      `“${issue.title}” kaydı artık ${validated.value.status} durumunda.`,
+    );
+
+    return {
+      issue: rowToIssue(updated.rows[0]),
+      authority,
+    };
+  });
+
+  sendJson(res, 200, {
+    issue: result.issue,
+    organization: result.authority,
+  }, origin);
+}
+
 async function route(req, res) {
   const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
 
@@ -1378,6 +1707,11 @@ async function route(req, res) {
   }
   if (req.method === 'POST' && path === '/v1/auth/claim-device') {
     await handleClaimDevice(req, res, origin);
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/v1/admin/organizations') {
+    await handleCreateOrganization(req, res, origin);
     return;
   }
 
@@ -1445,6 +1779,28 @@ async function route(req, res) {
     return;
   }
 
+  let organizationMembershipMatch = path.match(/^\/v1\/admin\/organizations\/([^/]+)\/memberships$/);
+  if (organizationMembershipMatch && req.method === 'POST') {
+    await handleAddOrganizationMembership(
+      req,
+      res,
+      origin,
+      decodeId(organizationMembershipMatch[1]),
+    );
+    return;
+  }
+
+  let issueAssignmentMatch = path.match(/^\/v1\/admin\/issues\/([^/]+)\/assignment$/);
+  if (issueAssignmentMatch && req.method === 'PUT') {
+    await handleAssignIssueOrganization(
+      req,
+      res,
+      origin,
+      decodeId(issueAssignmentMatch[1]),
+    );
+    return;
+  }
+
   let notificationMatch = path.match(/^\/v1\/me\/notifications\/([^/]+)\/read$/);
   if (notificationMatch && req.method === 'PUT') {
     await handleReadNotification(req, res, origin, decodeId(notificationMatch[1]));
@@ -1454,6 +1810,18 @@ async function route(req, res) {
   let moderationMatch = path.match(/^\/v1\/moderation\/reports\/([^/]+)$/);
   if (moderationMatch && req.method === 'PATCH') {
     await handleReviewModerationReport(req, res, origin, decodeId(moderationMatch[1]));
+    return;
+  }
+
+  let authorityMatch = path.match(/^\/v1\/issues\/([^/]+)\/authority$/);
+  if (authorityMatch && req.method === 'GET') {
+    await handleGetIssueAuthority(req, res, origin, decodeId(authorityMatch[1]));
+    return;
+  }
+
+  let officialStatusMatch = path.match(/^\/v1\/issues\/([^/]+)\/status$/);
+  if (officialStatusMatch && req.method === 'PATCH') {
+    await handleOfficialStatusUpdate(req, res, origin, decodeId(officialStatusMatch[1]));
     return;
   }
 
