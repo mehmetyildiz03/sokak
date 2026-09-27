@@ -247,6 +247,68 @@ export function MapView({
       });
 
       map.addLayer({
+        id: 'issue-recent-report-ring',
+        type: 'circle',
+        source: 'issues-clustered',
+        filter: [
+          'all',
+          ['!', ['has', 'point_count']],
+          ['==', ['get', 'recentReport'], 1],
+        ],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 11, 16, 16],
+          'circle-color': 'rgba(0,0,0,0)',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#145c68',
+          'circle-stroke-opacity': 0.72,
+        },
+      });
+
+      map.addLayer({
+        id: 'issue-comment-badge',
+        type: 'circle',
+        source: 'issues-clustered',
+        filter: [
+          'all',
+          ['!', ['has', 'point_count']],
+          ['>', ['get', 'comments'], 0],
+        ],
+        paint: {
+          'circle-radius': 8,
+          'circle-color': [
+            'case',
+            ['==', ['get', 'recentComment'], 1],
+            '#f0a728',
+            '#145c68',
+          ],
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
+          'circle-translate': [11, -11],
+        },
+      });
+
+      map.addLayer({
+        id: 'issue-comment-count',
+        type: 'symbol',
+        source: 'issues-clustered',
+        filter: [
+          'all',
+          ['!', ['has', 'point_count']],
+          ['>', ['get', 'comments'], 0],
+        ],
+        layout: {
+          'text-field': ['to-string', ['get', 'comments']],
+          'text-size': 9,
+          'text-font': ['Arial', 'Helvetica', 'sans-serif'],
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-translate': [11, -11],
+        },
+      });
+
+      map.addLayer({
         id: 'selected-issue-halo',
         type: 'circle',
         source: 'selected-issue',
