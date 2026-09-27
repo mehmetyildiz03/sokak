@@ -12,6 +12,19 @@ import {
   validateResolutionFeedback,
 } from './core.js';
 import { checkStorage, decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
+import {
+  createSessionId,
+  createSessionToken,
+  createUserId,
+  hashPassword,
+  hashSessionToken,
+  parseBearerToken,
+  publicUser,
+  sessionExpiry,
+  validateLoginInput,
+  validateRegistrationInput,
+  verifyPassword,
+} from './auth.js';
 
 const { Pool } = pg;
 
