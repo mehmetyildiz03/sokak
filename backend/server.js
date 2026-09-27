@@ -9,6 +9,7 @@ import {
   validateClientId,
   validateCommentBody,
   validateIssueInput,
+  validateModerationReport,
   validateResolutionFeedback,
 } from './core.js';
 import { checkStorage, decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
@@ -71,6 +72,7 @@ function createRateLimiter(limit, windowMs) {
 const allowWrite = createRateLimiter(60, 60_000);
 const allowComment = createRateLimiter(10, 10 * 60_000);
 const allowAuth = createRateLimiter(20, 15 * 60_000);
+const allowModeration = createRateLimiter(10, 60 * 60_000);
 
 function corsHeaders(origin) {
   if (!origin || !allowedOrigins.has(origin)) return {};
@@ -808,6 +810,62 @@ async function handleGetMedia(res, origin, key) {
   res.end();
 }
 
+
+async function handleModerationReport(req, res, origin) {
+  const user = await requireAuthenticatedUser(req);
+  if (!allowModeration(`moderation:${user.id}`)) {
+    sendJson(res, 429, { message: 'Kısa sürede çok fazla içerik raporlandı.' }, origin);
+    return;
+  }
+
+  const body = await readJson(req);
+  const validated = validateModerationReport(body);
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const input = validated.value;
+  const targetTable = input.targetType === 'issue' ? 'issues' : 'comments';
+  const exists = await pool.query(
+    `select 1 from ${targetTable} where id = $1 limit 1`,
+    [input.targetId],
+  );
+
+  if (exists.rowCount === 0) {
+    sendJson(res, 404, { message: 'Raporlanacak içerik bulunamadı.' }, origin);
+    return;
+  }
+
+  try {
+    const id = `mod-${randomUUID()}`;
+    const inserted = await pool.query(
+      `insert into moderation_reports (
+        id, reporter_user_id, target_type, target_id, reason, note
+      ) values ($1,$2,$3,$4,$5,$6)
+      returning id, target_type, target_id, reason, note, status, created_at`,
+      [id, user.id, input.targetType, input.targetId, input.reason, input.note],
+    );
+
+    const row = inserted.rows[0];
+    sendJson(res, 201, {
+      id: row.id,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      reason: row.reason,
+      note: row.note,
+      status: row.status,
+      createdAt: new Date(row.created_at).toISOString(),
+    }, origin);
+  } catch (error) {
+    if (error?.code === '23505') {
+      sendJson(res, 409, { message: 'Bu içeriği zaten inceleme için bildirdin.' }, origin);
+      return;
+    }
+    throw error;
+  }
+}
+
 async function route(req, res) {
   const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
 
@@ -842,6 +900,11 @@ async function route(req, res) {
   }
   if (req.method === 'POST' && path === '/v1/auth/claim-device') {
     await handleClaimDevice(req, res, origin);
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/v1/moderation/reports') {
+    await handleModerationReport(req, res, origin);
     return;
   }
 
