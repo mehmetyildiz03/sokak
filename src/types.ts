@@ -17,6 +17,7 @@ export interface Issue extends Point {
   description: string;
   confirms: number;
   comments: number;
+  lastCommentAt?: string;
   age: string;
   severity: 1 | 2 | 3;
   status: IssueStatus;
