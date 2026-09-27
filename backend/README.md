@@ -284,3 +284,25 @@ Yalnız `moderator/admin`. `open`, `reviewing`, `resolved`, `dismissed` veya `al
 Yalnız `moderator/admin`. Durum `reviewing`, `resolved` veya `dismissed` yapılabilir ve en fazla 1000 karakter moderatör notu eklenebilir. İnceleyen kullanıcı ve zaman audit alanlarında saklanır.
 
 Bu aşamada moderasyon kararı içeriği otomatik silmez/gizlemez; rapor durumu ile içerik yaptırımı bilinçli olarak ayrı tutulur.
+
+
+### GET /v1/issues/:id/history
+
+Gizli olmayan bir sorun kaydının kronolojik statü geçmişini döndürür.
+
+```json
+{
+  "events": [
+    {
+      "id": "hist-...",
+      "fromStatus": null,
+      "toStatus": "Yeni",
+      "actorType": "citizen",
+      "note": "Vatandaş bildirimi oluşturuldu.",
+      "createdAt": "2026-09-27T10:00:00.000Z"
+    }
+  ]
+}
+```
+
+Public cevapta ham `actor_id` / anonim istemci kimliği yayınlanmaz. Yalnız aktör türü, statü değişimi, açıklama ve zaman bilgisi görünür.
