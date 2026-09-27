@@ -57,13 +57,14 @@ function createRateLimiter(limit, windowMs) {
 
 const allowWrite = createRateLimiter(60, 60_000);
 const allowComment = createRateLimiter(10, 10 * 60_000);
+const allowAuth = createRateLimiter(20, 15 * 60_000);
 
 function corsHeaders(origin) {
   if (!origin || !allowedOrigins.has(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Sokak-Client-Id',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Sokak-Client-Id, Authorization',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -122,6 +123,75 @@ function requireClientId(req) {
   return clientId;
 }
 
+async function getAuthenticatedUser(req) {
+  const raw = Array.isArray(req.headers.authorization)
+    ? req.headers.authorization[0]
+    : req.headers.authorization;
+  const token = parseBearerToken(raw);
+  if (!token) return null;
+
+  const tokenHash = hashSessionToken(token);
+  const result = await pool.query(
+    `select u.*
+     from sessions s
+     join users u on u.id = s.user_id
+     where s.token_hash = $1
+       and s.revoked_at is null
+       and s.expires_at > now()
+       and u.disabled_at is null
+     limit 1`,
+    [tokenHash],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+async function requireAuthenticatedUser(req) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    const error = new Error('Oturum açman gerekiyor.');
+    error.statusCode = 401;
+    throw error;
+  }
+  return user;
+}
+
+async function resolveActor(req) {
+  const user = await getAuthenticatedUser(req);
+  if (user) {
+    return {
+      actorId: `user:${user.id}`,
+      authorLabel: user.display_name,
+      user,
+    };
+  }
+
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
+  return {
+    actorId: clientId,
+    authorLabel: createAuthorLabel(clientId),
+    user: null,
+  };
+}
+
+async function getUserStats(queryable, userId) {
+  const actorId = `user:${userId}`;
+  const [reports, confirmations, comments, follows] = await Promise.all([
+    queryable.query('select count(*)::int as count from issues where created_by_actor = $1', [actorId]),
+    queryable.query('select count(*)::int as count from confirmations where client_id = $1', [actorId]),
+    queryable.query('select count(*)::int as count from comments where client_id = $1', [actorId]),
+    queryable.query('select count(*)::int as count from follows where client_id = $1', [actorId]),
+  ]);
+
+  return {
+    reports: reports.rows[0]?.count ?? 0,
+    confirmations: confirmations.rows[0]?.count ?? 0,
+    comments: comments.rows[0]?.count ?? 0,
+    follows: follows.rows[0]?.count ?? 0,
+  };
+}
+
 function requireWriteBudget(clientId, kind = 'write') {
   if (!allowWrite(clientId)) {
     const error = new Error('Çok sık işlem yapıldı. Kısa süre sonra yeniden dene.');
@@ -163,6 +233,180 @@ async function withTransaction(work) {
   } finally {
     client.release();
   }
+}
+
+
+async function createSessionForUser(queryable, userId) {
+  const token = createSessionToken();
+  await queryable.query(
+    `insert into sessions (id, user_id, token_hash, expires_at)
+     values ($1, $2, $3, $4)`,
+    [createSessionId(), userId, hashSessionToken(token), sessionExpiry()],
+  );
+  return token;
+}
+
+async function handleRegister(req, res, origin) {
+  const ipKey = req.socket.remoteAddress ?? 'unknown';
+  if (!allowAuth(`register:${ipKey}`)) {
+    sendJson(res, 429, { message: 'Çok sık hesap denemesi yapıldı. Daha sonra tekrar dene.' }, origin);
+    return;
+  }
+
+  const body = await readJson(req);
+  const validated = validateRegistrationInput(body);
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const { username, displayName, password } = validated.value;
+
+  try {
+    const result = await withTransaction(async (client) => {
+      const passwordData = await hashPassword(password);
+      const id = createUserId();
+      const inserted = await client.query(
+        `insert into users (
+          id, username, display_name, password_hash, password_salt
+        ) values ($1,$2,$3,$4,$5)
+        returning *`,
+        [id, username, displayName, passwordData.hash, passwordData.salt],
+      );
+      const token = await createSessionForUser(client, id);
+      return { user: inserted.rows[0], token };
+    });
+
+    sendJson(res, 201, {
+      token: result.token,
+      user: publicUser(result.user, await getUserStats(pool, result.user.id)),
+    }, origin);
+  } catch (error) {
+    if (error?.code === '23505') {
+      sendJson(res, 409, { message: 'Bu kullanıcı adı zaten kullanılıyor.' }, origin);
+      return;
+    }
+    throw error;
+  }
+}
+
+async function handleLogin(req, res, origin) {
+  const body = await readJson(req);
+  const validated = validateLoginInput(body);
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const ipKey = req.socket.remoteAddress ?? 'unknown';
+  if (!allowAuth(`login:${ipKey}:${validated.value.username}`)) {
+    sendJson(res, 429, { message: 'Çok sık giriş denemesi yapıldı. Daha sonra tekrar dene.' }, origin);
+    return;
+  }
+
+  const result = await pool.query(
+    `select * from users
+     where username = $1 and disabled_at is null
+     limit 1`,
+    [validated.value.username],
+  );
+  const user = result.rows[0];
+
+  if (!user || !(await verifyPassword(
+    validated.value.password,
+    user.password_salt,
+    user.password_hash,
+  ))) {
+    sendJson(res, 401, { message: 'Kullanıcı adı veya parola yanlış.' }, origin);
+    return;
+  }
+
+  const token = await createSessionForUser(pool, user.id);
+  sendJson(res, 200, {
+    token,
+    user: publicUser(user, await getUserStats(pool, user.id)),
+  }, origin);
+}
+
+async function handleMe(req, res, origin) {
+  const user = await requireAuthenticatedUser(req);
+  sendJson(res, 200, {
+    user: publicUser(user, await getUserStats(pool, user.id)),
+  }, origin);
+}
+
+async function handleLogout(req, res, origin) {
+  const raw = Array.isArray(req.headers.authorization)
+    ? req.headers.authorization[0]
+    : req.headers.authorization;
+  const token = parseBearerToken(raw);
+  if (token) {
+    await pool.query(
+      'update sessions set revoked_at = now() where token_hash = $1',
+      [hashSessionToken(token)],
+    );
+  }
+  sendJson(res, 200, { ok: true }, origin);
+}
+
+async function migrateActorRows(client, tableName, oldActorId, newActorId) {
+  await client.query(
+    `insert into ${tableName} (issue_id, client_id, created_at)
+     select issue_id, $2, created_at
+     from ${tableName}
+     where client_id = $1
+     on conflict (issue_id, client_id) do nothing`,
+    [oldActorId, newActorId],
+  );
+  await client.query(
+    `delete from ${tableName} where client_id = $1`,
+    [oldActorId],
+  );
+}
+
+async function handleClaimDevice(req, res, origin) {
+  const user = await requireAuthenticatedUser(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
+  const userActorId = `user:${user.id}`;
+
+  await withTransaction(async (client) => {
+    await migrateActorRows(client, 'confirmations', clientId, userActorId);
+    await migrateActorRows(client, 'follows', clientId, userActorId);
+
+    await client.query(
+      `insert into resolution_feedback (
+        issue_id, client_id, value, created_at, updated_at
+      )
+      select issue_id, $2, value, created_at, updated_at
+      from resolution_feedback
+      where client_id = $1
+      on conflict (issue_id, client_id) do nothing`,
+      [clientId, userActorId],
+    );
+    await client.query(
+      'delete from resolution_feedback where client_id = $1',
+      [clientId],
+    );
+
+    await client.query(
+      `update comments
+       set client_id = $2, author_label = $3, updated_at = now()
+       where client_id = $1`,
+      [clientId, userActorId, user.display_name],
+    );
+
+    await client.query(
+      `update issues
+       set created_by_actor = $2
+       where created_by_actor = $1`,
+      [clientId, userActorId],
+    );
+  });
+
+  sendJson(res, 200, {
+    user: publicUser(user, await getUserStats(pool, user.id)),
+  }, origin);
 }
 
 async function getIssueRow(queryable, issueId, { forUpdate = false } = {}) {
@@ -228,7 +472,8 @@ async function handleGetIssues(res, origin) {
 }
 
 async function handleCreateIssue(req, res, origin) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   requireWriteBudget(clientId);
   const body = await readJson(req);
   const validated = validateIssueInput(body);
@@ -245,9 +490,9 @@ async function handleCreateIssue(req, res, origin) {
     const inserted = await client.query(
       `insert into issues (
         id, category, category_label, emoji, title, place, description,
-        longitude, latitude, severity, status, confirmation_count, comment_count, photo_url
+        longitude, latitude, severity, status, confirmation_count, comment_count, photo_url, created_by_actor
       ) values (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Yeni',1,0,$11
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Yeni',1,0,$11,$12
       )
       returning *`,
       [
@@ -262,6 +507,7 @@ async function handleCreateIssue(req, res, origin) {
         input.lat,
         input.severity,
         input.photoUrl,
+        clientId,
       ],
     );
 
@@ -285,7 +531,8 @@ async function handleCreateIssue(req, res, origin) {
 }
 
 async function handleGetMyConfirmations(req, res, origin) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   const result = await pool.query(
     `select issue_id from confirmations where client_id = $1 order by created_at desc`,
     [clientId],
@@ -294,7 +541,8 @@ async function handleGetMyConfirmations(req, res, origin) {
 }
 
 async function handleGetMyFollows(req, res, origin) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   const result = await pool.query(
     `select issue_id from follows where client_id = $1 order by created_at desc`,
     [clientId],
@@ -303,7 +551,8 @@ async function handleGetMyFollows(req, res, origin) {
 }
 
 async function handleFollow(req, res, origin, issueId, followed) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   requireWriteBudget(clientId);
 
   if (followed) {
@@ -330,7 +579,8 @@ async function handleFollow(req, res, origin, issueId, followed) {
 }
 
 async function handleConfirmation(req, res, origin, issueId) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   requireWriteBudget(clientId);
 
   const result = await withTransaction(async (client) => {
@@ -399,7 +649,8 @@ async function handleConfirmation(req, res, origin, issueId) {
 }
 
 async function handleGetCommunity(req, res, origin, issueId) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   const issue = await pool.query('select 1 from issues where id = $1', [issueId]);
   if (issue.rowCount === 0) {
     sendJson(res, 404, { message: 'Sorun kaydı bulunamadı.' }, origin);
@@ -409,7 +660,8 @@ async function handleGetCommunity(req, res, origin, issueId) {
 }
 
 async function handleAddComment(req, res, origin, issueId) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   requireWriteBudget(clientId, 'comment');
   const body = await readJson(req);
   const validated = validateCommentBody(body);
@@ -449,7 +701,8 @@ async function handleAddComment(req, res, origin, issueId) {
 }
 
 async function handleResolutionFeedback(req, res, origin, issueId) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   requireWriteBudget(clientId);
   const body = await readJson(req);
   const validated = validateResolutionFeedback(body);
@@ -488,7 +741,8 @@ async function handleResolutionFeedback(req, res, origin, issueId) {
 
 
 async function handleUploadPhoto(req, res, origin) {
-  const clientId = requireClientId(req);
+  const actor = await resolveActor(req);
+  const clientId = actor.actorId;
   requireWriteBudget(clientId);
   const body = await readJson(req, 12_000_000);
   const decoded = decodeImageDataUrl(body?.dataUrl);
@@ -558,6 +812,27 @@ async function route(req, res) {
 
   const url = new URL(req.url ?? '/', 'http://localhost');
   const path = url.pathname;
+
+  if (req.method === 'POST' && path === '/v1/auth/register') {
+    await handleRegister(req, res, origin);
+    return;
+  }
+  if (req.method === 'POST' && path === '/v1/auth/login') {
+    await handleLogin(req, res, origin);
+    return;
+  }
+  if (req.method === 'GET' && path === '/v1/auth/me') {
+    await handleMe(req, res, origin);
+    return;
+  }
+  if (req.method === 'POST' && path === '/v1/auth/logout') {
+    await handleLogout(req, res, origin);
+    return;
+  }
+  if (req.method === 'POST' && path === '/v1/auth/claim-device') {
+    await handleClaimDevice(req, res, origin);
+    return;
+  }
 
   if (req.method === 'GET' && path === '/health') {
     await pool.query('select 1');
