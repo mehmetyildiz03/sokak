@@ -60,10 +60,16 @@ export function ModerationQueuePanel({
   const review = async (
     report: ModerationQueueItem,
     nextStatus: 'reviewing' | 'resolved' | 'dismissed',
+    contentAction: 'none' | 'hide' | 'restore' = 'none',
   ) => {
     setBusyId(report.id);
     try {
-      await reviewModerationReport(report.id, nextStatus, notes[report.id]?.trim() || undefined);
+      await reviewModerationReport(
+        report.id,
+        nextStatus,
+        notes[report.id]?.trim() || undefined,
+        contentAction,
+      );
       notify(
         nextStatus === 'reviewing'
           ? 'Rapor incelemeye alındı.'
@@ -127,9 +133,12 @@ export function ModerationQueuePanel({
                 <span>{formatIssueAge(report.createdAt, 'şimdi')}</span>
               </div>
 
-              <strong className="moderation-review-reason">
-                {reasonLabels[report.reason] ?? report.reason}
-              </strong>
+              <div className="moderation-review-title-row">
+                <strong className="moderation-review-reason">
+                  {reasonLabels[report.reason] ?? report.reason}
+                </strong>
+                {report.targetHidden && <span className="moderation-hidden-chip">Gizli</span>}
+              </div>
 
               <p className="moderation-review-preview">
                 {report.targetPreview || 'İçerik önizlemesi bulunamadı.'}
@@ -172,11 +181,11 @@ export function ModerationQueuePanel({
                     )}
                     <button
                       type="button"
-                      className="resolve"
+                      className="hide-target"
                       disabled={busyId === report.id}
-                      onClick={() => void review(report, 'resolved')}
+                      onClick={() => void review(report, 'resolved', 'hide')}
                     >
-                      Çözüldü
+                      Gizle + kapat
                     </button>
                     <button
                       type="button"
@@ -184,10 +193,21 @@ export function ModerationQueuePanel({
                       disabled={busyId === report.id}
                       onClick={() => void review(report, 'dismissed')}
                     >
-                      Reddet
+                      İhlal yok
                     </button>
                   </div>
                 </>
+              )}
+
+              {report.targetHidden && status !== 'open' && (
+                <button
+                  type="button"
+                  className="moderation-restore-button"
+                  disabled={busyId === report.id}
+                  onClick={() => void review(report, 'resolved', 'restore')}
+                >
+                  İçeriği geri aç
+                </button>
               )}
 
               {report.moderatorNote && status !== 'open' && (
