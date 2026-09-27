@@ -322,6 +322,7 @@ export class IndexedDbIssueRepository implements IssueRepository {
     issueStore.put({
       ...issue,
       comments: issue.comments + 1,
+      lastCommentAt: now,
       updatedAt: now,
     } satisfies Issue);
 
