@@ -1602,6 +1602,7 @@ async function handleGetIssueAuthority(req, res, origin, issueId) {
 }
 
 async function handleOfficialStatusUpdate(req, res, origin, issueId) {
+  await requireAuthenticatedUser(req);
   const body = await readJson(req);
   const validated = validateOfficialStatusUpdate(body);
 
