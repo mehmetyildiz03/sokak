@@ -133,6 +133,14 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   assert.equal(comment.issueId, created.id);
   assert.match(comment.authorLabel, /^Komşu /);
 
+  response = await fetch(`${baseUrl}/v1/issues`);
+  assert.equal(response.status, 200);
+  const issuesAfterComment = await response.json();
+  const mapIssueAfterComment = issuesAfterComment.find((item) => item.id === created.id);
+  assert.ok(mapIssueAfterComment);
+  assert.equal(mapIssueAfterComment.comments, 1);
+  assert.ok(mapIssueAfterComment.lastCommentAt);
+
   response = await fetch(`${baseUrl}/v1/issues/${created.id}/community`, {
     headers: headersB,
   });
