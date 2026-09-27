@@ -100,3 +100,30 @@ jobs:
           status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X PATCH             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-moderator-review-smoke'             --data '{"status":"reviewing","moderatorNote":"smoke"}'             https://sokak-api-production.up.railway.app/v1/moderation/reports/mod-smoke)"
           test "$status" = "401"
           grep -q 'Oturum açman gerekiyor' "$body"
+
+      - name: Notifications list endpoint
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -D "$headers" -o "$body" -w '%{http_code}'             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'X-Sokak-Client-Id: production-notification-smoke'             'https://sokak-api-production.up.railway.app/v1/me/notifications?limit=5')"
+          test "$status" = "200"
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          grep -q '"unreadCount"' "$body"
+          grep -q '"notifications"' "$body"
+
+      - name: Notifications read-all endpoint
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X POST             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-notification-smoke'             https://sokak-api-production.up.railway.app/v1/me/notifications/read-all)"
+          test "$status" = "200"
+          grep -q '"updated"' "$body"
+
+      - name: Notification item read endpoint rejects unknown id
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X PUT             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-notification-smoke'             https://sokak-api-production.up.railway.app/v1/me/notifications/ntf-production-smoke/read)"
+          test "$status" = "404"
+          grep -q 'Bildirim bulunamadı' "$body"
