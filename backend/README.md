@@ -36,6 +36,40 @@ CI, geçici PostgreSQL üzerinde iki farklı istemciyle şu akışı uçtan uca 
 
 Bileşenler repository implementasyonunu bilmez.
 
+## Hesap ve oturum
+
+Hesap açmayan kullanıcılar anonim `X-Sokak-Client-Id` ile devam eder. Hesap açıldığında API aynı endpoint'lerde bearer oturumunu öncelikli kimlik olarak kullanır.
+
+### POST /v1/auth/register
+
+Body:
+
+```json
+{
+  "username": "mehmet.yildiz",
+  "displayName": "Mehmet Yıldız",
+  "password": "en-az-10-karakter"
+}
+```
+
+Parola Node `crypto.scrypt` ile rastgele salt kullanılarak türetilir; düz parola saklanmaz. Başarılı kayıt bir bearer token ve public kullanıcı profili döndürür.
+
+### POST /v1/auth/login
+
+Kullanıcı adı + parola ile yeni 30 günlük oturum oluşturur.
+
+### GET /v1/auth/me
+
+`Authorization: Bearer <token>` ile kullanıcı profili ve katkı sayaçlarını döndürür.
+
+### POST /v1/auth/logout
+
+Geçerli session token hash'ini revoke eder.
+
+### POST /v1/auth/claim-device
+
+Giriş yapmış kullanıcı için mevcut tarayıcının anonim doğrulama, takip, çözüm görüşü, yorum ve bildirim sahipliğini `user:<id>` aktörüne taşır.
+
 ## REST v1
 
 Tüm cevaplar JSON'dur.
@@ -216,7 +250,7 @@ Private bucket'taki fotoğrafı güvenli object-key doğrulamasından sonra stre
 
 ## Kimlik stratejisi
 
-v0.5 yerel aşamada anonim `clientId` kullanılır. Gerçek hesap sistemi geldiğinde repository sözleşmesi korunup header yerine authenticated user id kullanılacaktır.
+Canlı API hibrit kimlik kullanır. Hesap açmayan istemci anonim `clientId` ile çalışır; geçerli bearer token bulunduğunda tüm kişisel işlemler `user:<id>` aktörüne bağlanır. Session token'ın kendisi veritabanında tutulmaz; yalnız SHA-256 hash'i saklanır.
 
 ## Fotoğraflar
 
@@ -225,7 +259,7 @@ IndexedDB modunda frontend data URL saklar. Canlı API modunda `ApiIssueReposito
 
 ## Production öncesi zorunlu kalanlar
 
-1. Anonim client ID yerine gerçek hesap/oturum doğrulaması.
+1. E-posta/telefon doğrulama, parola sıfırlama ve güvenli hesap kurtarma.
 2. Dağıtık rate limiting / abuse prevention; mevcut limiter tek process içindir.
 3. Moderasyon, yorum şikâyeti ve kullanıcı engelleme akışları.
 4. Kurum hesabı için ayrı yetki modeli; vatandaş endpoint'leri kurumsal statü değiştiremez.
