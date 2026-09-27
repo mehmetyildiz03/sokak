@@ -68,3 +68,19 @@ jobs:
           curl --fail --silent --show-error             -X OPTIONS -D "$headers" -o /dev/null             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Access-Control-Request-Method: GET'             -H 'Access-Control-Request-Headers: authorization,x-sokak-client-id'             https://sokak-api-production.up.railway.app/v1/auth/me
           grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
           grep -qi '^access-control-allow-headers: .*Authorization' "$headers"
+
+      - name: Moderation endpoint requires account
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X POST             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-moderation-smoke'             --data '{"targetType":"issue","targetId":"iss-smoke","reason":"spam"}'             https://sokak-api-production.up.railway.app/v1/moderation/reports)"
+          test "$status" = "401"
+          grep -q 'Oturum açman gerekiyor' "$body"
+
+      - name: Moderation preflight
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl --fail --silent --show-error             -X OPTIONS -D "$headers" -o /dev/null             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Access-Control-Request-Method: POST'             -H 'Access-Control-Request-Headers: content-type,authorization,x-sokak-client-id'             https://sokak-api-production.up.railway.app/v1/moderation/reports
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          grep -qi '^access-control-allow-headers: .*Authorization' "$headers"
