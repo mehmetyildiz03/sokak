@@ -163,3 +163,11 @@ jobs:
           status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -X PATCH             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Content-Type: application/json'             -H 'X-Sokak-Client-Id: production-official-status-smoke'             --data '{"status":"İşlemde","note":"Production smoke test güncellemesi."}'             https://sokak-api-production.up.railway.app/v1/issues/iss-production-official-smoke/status)"
           test "$status" = "401"
           grep -q 'Oturum açman gerekiyor' "$body"
+
+      - name: Admin organization list requires admin
+        run: |
+          set -euo pipefail
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -o "$body" -w '%{http_code}'             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'X-Sokak-Client-Id: production-admin-list-smoke'             https://sokak-api-production.up.railway.app/v1/admin/organizations)"
+          test "$status" = "401"
+          grep -q 'Oturum açman gerekiyor' "$body"
