@@ -358,4 +358,20 @@ test('shared API supports a multi-client civic participation flow', { skip: !dat
   response = await fetch(`${baseUrl}/v1/issues`);
   publicIssues = await response.json();
   assert.equal(publicIssues.some((item) => item.id === created.id), true);
+
+  const auditDb = new Pool({ connectionString: databaseUrl });
+  const auditRows = await auditDb.query(
+    `select previous_status, new_status, content_action
+     from moderation_actions
+     where report_id = $1
+     order by created_at asc`,
+    [moderation.id],
+  );
+  await auditDb.end();
+
+  assert.equal(auditRows.rows.length, 3);
+  assert.deepEqual(
+    auditRows.rows.map((row) => row.content_action),
+    ['none', 'hide', 'restore'],
+  );
 });
