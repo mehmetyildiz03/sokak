@@ -166,8 +166,7 @@ async function resolveActor(req) {
     };
   }
 
-  const actor = await resolveActor(req);
-  const clientId = actor.actorId;
+  const clientId = requireClientId(req);
   return {
     actorId: clientId,
     authorLabel: createAuthorLabel(clientId),
@@ -366,8 +365,7 @@ async function migrateActorRows(client, tableName, oldActorId, newActorId) {
 
 async function handleClaimDevice(req, res, origin) {
   const user = await requireAuthenticatedUser(req);
-  const actor = await resolveActor(req);
-  const clientId = actor.actorId;
+  const clientId = requireClientId(req);
   const userActorId = `user:${user.id}`;
 
   await withTransaction(async (client) => {
@@ -684,7 +682,7 @@ async function handleAddComment(req, res, origin, issueId) {
         id, issue_id, client_id, author_label, body
       ) values ($1,$2,$3,$4,$5)
       returning id, issue_id, author_label, body, created_at`,
-      [id, issueId, clientId, createAuthorLabel(clientId), validated.value],
+      [id, issueId, clientId, actor.authorLabel, validated.value],
     );
 
     await client.query(
