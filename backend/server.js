@@ -10,6 +10,7 @@ import {
   validateCommentBody,
   validateIssueInput,
   validateModerationReport,
+  validateModerationReview,
   validateResolutionFeedback,
 } from './core.js';
 import { checkStorage, decodeImageDataUrl, getIssuePhoto, putIssuePhoto } from './storage.js';
@@ -166,6 +167,16 @@ async function requireAuthenticatedUser(req) {
   if (!user) {
     const error = new Error('Oturum açman gerekiyor.');
     error.statusCode = 401;
+    throw error;
+  }
+  return user;
+}
+
+async function requireModerator(req) {
+  const user = await requireAuthenticatedUser(req);
+  if (user.role !== 'moderator' && user.role !== 'admin') {
+    const error = new Error('Bu işlem için moderatör yetkisi gerekiyor.');
+    error.statusCode = 403;
     throw error;
   }
   return user;
@@ -866,6 +877,109 @@ async function handleModerationReport(req, res, origin) {
   }
 }
 
+
+async function handleListModerationReports(req, res, origin, url) {
+  await requireModerator(req);
+
+  const requestedStatus = url.searchParams.get('status') ?? 'open';
+  const allowedStatuses = new Set(['open', 'reviewing', 'resolved', 'dismissed', 'all']);
+  const status = allowedStatuses.has(requestedStatus) ? requestedStatus : 'open';
+
+  const params = [];
+  const where = status === 'all' ? '' : 'where r.status = $1';
+  if (status !== 'all') params.push(status);
+
+  const result = await pool.query(
+    `select
+       r.id,
+       r.target_type,
+       r.target_id,
+       r.reason,
+       r.note,
+       r.status,
+       r.moderator_note,
+       r.reviewed_at,
+       r.created_at,
+       u.username as reporter_username,
+       u.display_name as reporter_display_name,
+       case
+         when r.target_type = 'issue' then (
+           select i.title from issues i where i.id = r.target_id
+         )
+         when r.target_type = 'comment' then (
+           select left(c.body, 180) from comments c where c.id = r.target_id
+         )
+         else null
+       end as target_preview
+     from moderation_reports r
+     join users u on u.id = r.reporter_user_id
+     ${where}
+     order by r.created_at desc
+     limit 200`,
+    params,
+  );
+
+  sendJson(res, 200, {
+    reports: result.rows.map((row) => ({
+      id: row.id,
+      targetType: row.target_type,
+      targetId: row.target_id,
+      targetPreview: row.target_preview,
+      reason: row.reason,
+      note: row.note,
+      status: row.status,
+      moderatorNote: row.moderator_note,
+      reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : null,
+      createdAt: new Date(row.created_at).toISOString(),
+      reporter: {
+        username: row.reporter_username,
+        displayName: row.reporter_display_name,
+      },
+    })),
+  }, origin);
+}
+
+async function handleReviewModerationReport(req, res, origin, reportId) {
+  const moderator = await requireModerator(req);
+  const body = await readJson(req);
+  const validated = validateModerationReview(body);
+
+  if (!validated.ok) {
+    sendJson(res, 400, { message: validated.message }, origin);
+    return;
+  }
+
+  const updated = await pool.query(
+    `update moderation_reports
+     set status = $2,
+         moderator_note = $3,
+         reviewed_by_user_id = $4,
+         reviewed_at = now(),
+         updated_at = now()
+     where id = $1
+     returning id, status, moderator_note, reviewed_at`,
+    [
+      reportId,
+      validated.value.status,
+      validated.value.moderatorNote,
+      moderator.id,
+    ],
+  );
+
+  if (updated.rowCount === 0) {
+    sendJson(res, 404, { message: 'Moderasyon raporu bulunamadı.' }, origin);
+    return;
+  }
+
+  const row = updated.rows[0];
+  sendJson(res, 200, {
+    id: row.id,
+    status: row.status,
+    moderatorNote: row.moderator_note,
+    reviewedAt: new Date(row.reviewed_at).toISOString(),
+  }, origin);
+}
+
 async function route(req, res) {
   const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
 
@@ -950,6 +1064,12 @@ async function route(req, res) {
   }
   if (req.method === 'GET' && path === '/v1/me/follows') {
     await handleGetMyFollows(req, res, origin);
+    return;
+  }
+
+  let moderationMatch = path.match(/^\/v1\/moderation\/reports\/([^/]+)$/);
+  if (moderationMatch && req.method === 'PATCH') {
+    await handleReviewModerationReport(req, res, origin, decodeId(moderationMatch[1]));
     return;
   }
 
