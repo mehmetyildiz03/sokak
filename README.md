@@ -22,6 +22,7 @@ v0.5, v0.4 harita/persistence temelini koruyup Sokak'a topluluk katılım katman
 - Sorun / yoğunluk görünümü; yakın zoom'da gerçek sorun noktalarına geçiş
 - Sorun detay bottom-sheet'i
 - Gerçek **süreç geçmişi**: bildirim oluşturulması ve statü değişimleri `status_history` üzerinden kronolojik timeline olarak gösterilir
+- **Doğrulanmış kurum katmanı**: kurum oluşturma, kullanıcı üyeliği, sorun-kurum ataması ve yalnız atanmış kurum yetkilisinin `İşlemde → Çözüldü` yaşam döngüsünü yönetmesi
 - İdempotent “Ben de gördüm” doğrulaması
 - Dört adımlı sorun bildirme akışı
 - Sorun konumunu mini haritada sürüklenebilir pinle veya haritaya dokunarak hassas seçme
@@ -133,7 +134,7 @@ npm run preview
 
 - Hesap açmadan kullanım anonim `clientId` ile devam eder; hesap açan kullanıcıların takip/doğrulama/yorum kimliği kullanıcı hesabına bağlanır. Anonim geçmiş tek seferlik hesaba taşınabilir.
 - Fotoğraflar canlı API modunda object storage'a yüklenir; yerel IndexedDB modu data URL saklamaya devam eder.
-- Moderasyon raporlama ve inceleme kuyruğu vardır; ancak içerik gizleme/silme yaptırımları, itiraz akışı, e-posta/telefon doğrulama, bildirim gönderimi ve kurum yetki modeli henüz tamamlanmamıştır.
+- Moderasyon raporlama, geri alınabilir gizleme/geri açma, bildirim merkezi ve doğrulanmış kurum yetki modeli vardır; ancak itiraz akışı, e-posta/telefon doğrulama, parola kurtarma ve kurum onboarding/başvuru doğrulama süreci henüz tamamlanmamıştır.
 - Mevcut rate limit tek API process'i içindedir; yatay ölçek öncesi dağıtık rate limiting gerekir.
 - Harita tabanı prototipte doğrudan OpenStreetMap raster tile sunucusunu kullanır; gerçek trafik öncesi production tile altyapısı seçilmelidir.
 - Ters geocoding prototipte public Nominatim kullanır. Kullanım politikası gereği ağır trafik için uygun değildir; gerçek ölçek öncesi kendi/profesyonel geocoder altyapısına geçilmelidir.
