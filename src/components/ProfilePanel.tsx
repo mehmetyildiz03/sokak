@@ -8,6 +8,7 @@ interface ProfilePanelProps {
   onRegister: (input: { username: string; displayName: string; password: string }) => Promise<void>;
   onLogout: () => Promise<void>;
   onClaimDevice: () => Promise<void>;
+  onOpenModeration: () => void;
 }
 
 export function ProfilePanel({
@@ -17,6 +18,7 @@ export function ProfilePanel({
   onRegister,
   onLogout,
   onClaimDevice,
+  onOpenModeration,
 }: ProfilePanelProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
@@ -44,7 +46,15 @@ export function ProfilePanel({
             <span className="eyebrow">Sokak hesabı</span>
             <h1 id="profileTitle">Profil</h1>
           </div>
-          <span className="profile-role">Vatandaş</span>
+          <span className="profile-role">
+            {user.role === 'admin'
+              ? 'Admin'
+              : user.role === 'moderator'
+                ? 'Moderatör'
+                : user.role === 'official'
+                  ? 'Kurum'
+                  : 'Vatandaş'}
+          </span>
         </header>
 
         <div className="profile-identity">
@@ -65,6 +75,21 @@ export function ProfilePanel({
             </div>
           ))}
         </div>
+
+        {(user.role === 'moderator' || user.role === 'admin') && (
+          <div className="profile-moderation-card">
+            <span className="eyebrow">Moderasyon</span>
+            <strong>İnceleme kuyruğu</strong>
+            <p>Topluluğun bildirdiği sorun kayıtlarını ve yorumları incele.</p>
+            <button
+              type="button"
+              className="profile-primary"
+              onClick={onOpenModeration}
+            >
+              Kuyruğu aç
+            </button>
+          </div>
+        )}
 
         <div className="profile-account-card">
           <span className="eyebrow">Cihaz geçmişi</span>
