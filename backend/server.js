@@ -982,7 +982,9 @@ async function handleAddComment(req, res, origin, issueId) {
 
     await client.query(
       `update issues
-       set comment_count = comment_count + 1, updated_at = now()
+       set comment_count = comment_count + 1,
+           last_comment_at = now(),
+           updated_at = now()
        where id = $1`,
       [issueId],
     );
