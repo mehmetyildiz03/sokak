@@ -1,5 +1,31 @@
--- Sokak v0.5 future PostgreSQL schema.
--- Şu anda deploy edilmez.
+-- Sokak production PostgreSQL schema.
+
+create table if not exists users (
+  id text primary key,
+  username text not null unique,
+  display_name text not null,
+  password_hash text not null,
+  password_salt text not null,
+  role text not null default 'citizen'
+    check (role in ('citizen','moderator','official','admin')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  disabled_at timestamptz
+);
+
+create index if not exists users_username_idx on users(username);
+
+create table if not exists sessions (
+  id text primary key,
+  user_id text not null references users(id) on delete cascade,
+  token_hash text not null unique,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null,
+  revoked_at timestamptz
+);
+
+create index if not exists sessions_user_idx on sessions(user_id);
+create index if not exists sessions_expiry_idx on sessions(expires_at);
 
 create table if not exists issues (
   id text primary key,
@@ -17,6 +43,7 @@ create table if not exists issues (
   confirmation_count integer not null default 1 check (confirmation_count >= 0),
   comment_count integer not null default 0 check (comment_count >= 0),
   photo_url text,
+  created_by_actor text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -86,3 +113,7 @@ create index if not exists status_history_issue_created_idx
 -- 1. client_id yerine authenticated user ilişkisi eklenecek.
 -- 2. Yakınlık sorguları büyüdüğünde PostGIS geography(Point,4326) kullanılacak.
 -- 3. Fotoğraflar object storage'da tutulacak.
+
+
+alter table issues
+  add column if not exists created_by_actor text;
