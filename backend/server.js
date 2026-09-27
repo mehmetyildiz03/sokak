@@ -1271,7 +1271,7 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
       }
 
       const targetResult = await client.query(
-        `select id, hidden_at${tableName === 'comments' ? ', issue_id' : ''}
+        `select id, hidden_at${tableName === 'comments' ? ', issue_id, created_at' : ''}
          from ${tableName}
          where id = $1
          for update`,
@@ -1300,6 +1300,12 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
           await client.query(
             `update issues
              set comment_count = greatest(0, comment_count - 1),
+                 last_comment_at = (
+                   select max(created_at)
+                   from comments
+                   where issue_id = $1
+                     and hidden_at is null
+                 ),
                  updated_at = now()
              where id = $1`,
             [target.issue_id],
@@ -1321,9 +1327,13 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
           await client.query(
             `update issues
              set comment_count = comment_count + 1,
+                 last_comment_at = greatest(
+                   coalesce(last_comment_at, $2::timestamptz),
+                   $2::timestamptz
+                 ),
                  updated_at = now()
              where id = $1`,
-            [target.issue_id],
+            [target.issue_id, target.created_at],
           );
         }
         targetHidden = false;
