@@ -435,7 +435,10 @@ async function handleClaimDevice(req, res, origin) {
 
 async function getIssueRow(queryable, issueId, { forUpdate = false } = {}) {
   const suffix = forUpdate ? ' FOR UPDATE' : '';
-  const result = await queryable.query(`select * from issues where id = $1${suffix}`, [issueId]);
+  const result = await queryable.query(
+    `select * from issues where id = $1 and hidden_at is null${suffix}`,
+    [issueId],
+  );
   return result.rows[0] ?? null;
 }
 
@@ -447,6 +450,7 @@ async function getCommunitySnapshot(queryable, issueId, clientId) {
          select id, issue_id, author_label, body, created_at
          from comments
          where issue_id = $1
+           and hidden_at is null
          order by created_at desc
          limit 100
        ) recent
@@ -489,6 +493,7 @@ async function handleGetIssues(res, origin) {
   const result = await pool.query(
     `select *
      from issues
+     where hidden_at is null
      order by created_at desc
      limit 5000`,
   );
@@ -580,7 +585,10 @@ async function handleFollow(req, res, origin, issueId, followed) {
   requireWriteBudget(clientId);
 
   if (followed) {
-    const exists = await pool.query('select 1 from issues where id = $1', [issueId]);
+    const exists = await pool.query(
+      'select 1 from issues where id = $1 and hidden_at is null',
+      [issueId],
+    );
     if (exists.rowCount === 0) {
       sendJson(res, 404, { message: 'Sorun kaydı bulunamadı.' }, origin);
       return;
@@ -675,7 +683,10 @@ async function handleConfirmation(req, res, origin, issueId) {
 async function handleGetCommunity(req, res, origin, issueId) {
   const actor = await resolveActor(req);
   const clientId = actor.actorId;
-  const issue = await pool.query('select 1 from issues where id = $1', [issueId]);
+  const issue = await pool.query(
+    'select 1 from issues where id = $1 and hidden_at is null',
+    [issueId],
+  );
   if (issue.rowCount === 0) {
     sendJson(res, 404, { message: 'Sorun kaydı bulunamadı.' }, origin);
     return;
@@ -899,6 +910,7 @@ async function handleListModerationReports(req, res, origin, url) {
        r.status,
        r.moderator_note,
        r.reviewed_at,
+       r.action_taken,
        r.created_at,
        u.username as reporter_username,
        u.display_name as reporter_display_name,
@@ -910,7 +922,16 @@ async function handleListModerationReports(req, res, origin, url) {
            select left(c.body, 180) from comments c where c.id = r.target_id
          )
          else null
-       end as target_preview
+       end as target_preview,
+       case
+         when r.target_type = 'issue' then (
+           select (i.hidden_at is not null) from issues i where i.id = r.target_id
+         )
+         when r.target_type = 'comment' then (
+           select (c.hidden_at is not null) from comments c where c.id = r.target_id
+         )
+         else false
+       end as target_hidden
      from moderation_reports r
      join users u on u.id = r.reporter_user_id
      ${where}
@@ -929,6 +950,8 @@ async function handleListModerationReports(req, res, origin, url) {
       note: row.note,
       status: row.status,
       moderatorNote: row.moderator_note,
+      actionTaken: row.action_taken,
+      targetHidden: Boolean(row.target_hidden),
       reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : null,
       createdAt: new Date(row.created_at).toISOString(),
       reporter: {
@@ -949,34 +972,142 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
     return;
   }
 
-  const updated = await pool.query(
-    `update moderation_reports
-     set status = $2,
-         moderator_note = $3,
-         reviewed_by_user_id = $4,
-         reviewed_at = now(),
-         updated_at = now()
-     where id = $1
-     returning id, status, moderator_note, reviewed_at`,
-    [
-      reportId,
-      validated.value.status,
-      validated.value.moderatorNote,
-      moderator.id,
-    ],
-  );
+  const result = await withTransaction(async (client) => {
+    const reportResult = await client.query(
+      `select * from moderation_reports where id = $1 for update`,
+      [reportId],
+    );
+    const report = reportResult.rows[0];
 
-  if (updated.rowCount === 0) {
-    sendJson(res, 404, { message: 'Moderasyon raporu bulunamadı.' }, origin);
-    return;
-  }
+    if (!report) {
+      const error = new Error('Moderasyon raporu bulunamadı.');
+      error.statusCode = 404;
+      throw error;
+    }
 
-  const row = updated.rows[0];
+    let targetHidden = false;
+    const contentAction = validated.value.contentAction;
+
+    if (contentAction !== 'none') {
+      const tableName = report.target_type === 'issue'
+        ? 'issues'
+        : report.target_type === 'comment'
+          ? 'comments'
+          : null;
+
+      if (!tableName) {
+        const error = new Error('Moderasyon hedefi geçersiz.');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const targetResult = await client.query(
+        `select id, hidden_at${tableName === 'comments' ? ', issue_id' : ''}
+         from ${tableName}
+         where id = $1
+         for update`,
+        [report.target_id],
+      );
+      const target = targetResult.rows[0];
+
+      if (!target) {
+        const error = new Error('Moderasyon hedefi artık bulunamıyor.');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (contentAction === 'hide' && !target.hidden_at) {
+        await client.query(
+          `update ${tableName}
+           set hidden_at = now(),
+               hidden_by_user_id = $2,
+               moderation_note = $3,
+               updated_at = now()
+           where id = $1`,
+          [report.target_id, moderator.id, validated.value.moderatorNote],
+        );
+
+        if (tableName === 'comments') {
+          await client.query(
+            `update issues
+             set comment_count = greatest(0, comment_count - 1),
+                 updated_at = now()
+             where id = $1`,
+            [target.issue_id],
+          );
+        }
+        targetHidden = true;
+      } else if (contentAction === 'restore' && target.hidden_at) {
+        await client.query(
+          `update ${tableName}
+           set hidden_at = null,
+               hidden_by_user_id = null,
+               moderation_note = $2,
+               updated_at = now()
+           where id = $1`,
+          [report.target_id, validated.value.moderatorNote],
+        );
+
+        if (tableName === 'comments') {
+          await client.query(
+            `update issues
+             set comment_count = comment_count + 1,
+                 updated_at = now()
+             where id = $1`,
+            [target.issue_id],
+          );
+        }
+        targetHidden = false;
+      } else {
+        targetHidden = Boolean(target.hidden_at);
+      }
+    } else {
+      const tableName = report.target_type === 'issue'
+        ? 'issues'
+        : report.target_type === 'comment'
+          ? 'comments'
+          : null;
+      if (tableName) {
+        const targetState = await client.query(
+          `select hidden_at from ${tableName} where id = $1`,
+          [report.target_id],
+        );
+        targetHidden = Boolean(targetState.rows[0]?.hidden_at);
+      }
+    }
+
+    const updated = await client.query(
+      `update moderation_reports
+       set status = $2,
+           moderator_note = $3,
+           reviewed_by_user_id = $4,
+           reviewed_at = now(),
+           action_taken = $5,
+           updated_at = now()
+       where id = $1
+       returning id, status, moderator_note, reviewed_at, action_taken`,
+      [
+        reportId,
+        validated.value.status,
+        validated.value.moderatorNote,
+        moderator.id,
+        contentAction,
+      ],
+    );
+
+    return {
+      row: updated.rows[0],
+      targetHidden,
+    };
+  });
+
   sendJson(res, 200, {
-    id: row.id,
-    status: row.status,
-    moderatorNote: row.moderator_note,
-    reviewedAt: new Date(row.reviewed_at).toISOString(),
+    id: result.row.id,
+    status: result.row.status,
+    moderatorNote: result.row.moderator_note,
+    actionTaken: result.row.action_taken,
+    targetHidden: result.targetHidden,
+    reviewedAt: new Date(result.row.reviewed_at).toISOString(),
   }, origin);
 }
 
