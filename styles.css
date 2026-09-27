@@ -2503,3 +2503,113 @@ button:disabled { cursor: default; }
   font-size: 9px;
   line-height: 1.45;
 }
+
+/* Verified institution authority */
+.issue-authority {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid rgba(26, 120, 91, .16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fcfa 0%, #f1f8f5 100%);
+}
+.issue-authority.loading {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 9px;
+}
+.issue-authority-head {
+  display: grid;
+  grid-template-columns: 40px minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.issue-authority-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: #e6f5ed;
+  color: #287656;
+  font-size: 16px;
+  font-weight: 900;
+}
+.issue-authority-head h3 {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.25;
+  letter-spacing: -.015em;
+}
+.issue-authority-head small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 8px;
+}
+.issue-authority-verified {
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: #e3f4eb;
+  color: #287656;
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.official-status-editor {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(26,120,91,.12);
+}
+.official-status-editor label {
+  display: grid;
+  gap: 5px;
+}
+.official-status-editor label > span {
+  color: #4f665d;
+  font-size: 9px;
+  font-weight: 850;
+}
+.official-status-editor textarea {
+  min-height: 76px;
+  resize: vertical;
+  border: 1px solid #d8e7e0;
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: rgba(255,255,255,.92);
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.official-status-editor textarea:focus {
+  outline: 3px solid rgba(26,120,91,.09);
+  border-color: rgba(26,120,91,.38);
+}
+.official-status-editor > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  margin-top: 7px;
+}
+.official-status-editor > div small {
+  color: var(--muted);
+  font-size: 8px;
+}
+.official-status-editor button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  padding: 8px 12px;
+  background: #2f7d5e;
+  color: white;
+  font-size: 9px;
+  font-weight: 900;
+}
+.official-status-editor button:disabled {
+  opacity: .48;
+}
