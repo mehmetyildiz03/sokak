@@ -121,6 +121,7 @@ export function rowToIssue(row) {
     description: row.description,
     confirms: Number(row.confirmation_count),
     comments: Number(row.comment_count),
+    lastCommentAt: row.last_comment_at ? new Date(row.last_comment_at).toISOString() : undefined,
     age: 'şimdi',
     severity: Number(row.severity),
     status: row.status,
