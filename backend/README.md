@@ -262,7 +262,7 @@ IndexedDB modunda frontend data URL saklar. Canlı API modunda `ApiIssueReposito
 1. E-posta/telefon doğrulama, parola sıfırlama ve güvenli hesap kurtarma.
 2. Dağıtık rate limiting / abuse prevention; mevcut limiter tek process içindir.
 3. Moderasyon yaptırım politikası: içerik gizleme/silme, kullanıcı engelleme, itiraz ve audit görünürlüğü.
-4. Kurum hesabı için ayrı yetki modeli; vatandaş endpoint'leri kurumsal statü değiştiremez.
+4. Kurum onboarding/başvuru doğrulama süreci ve kurum yöneticilerinin üyelik/atama self-service ekranları.
 5. Yedekleme/restore politikası, gözlemlenebilirlik ve production tile/geocoding kapasite planı.
 
 
@@ -306,3 +306,40 @@ Gizli olmayan bir sorun kaydının kronolojik statü geçmişini döndürür.
 ```
 
 Public cevapta ham `actor_id` / anonim istemci kimliği yayınlanmaz. Yalnız aktör türü, statü değişimi, açıklama ve zaman bilgisi görünür.
+
+## Doğrulanmış kurum ve resmi statü akışı
+
+Kurum statüsü yalnız üç koşul birlikte sağlandığında değiştirilebilir:
+
+1. Kurum `organizations.verified_at` ile doğrulanmış olmalı.
+2. Sorun `issue_assignments` üzerinden o kuruma açıkça atanmış olmalı.
+3. İşlemi yapan hesap `organization_memberships` içinde aktif üye olmalı.
+
+Global `official` rolü tek başına statü değiştirme yetkisi vermez.
+
+### POST /v1/admin/organizations
+
+Yalnız global `admin`. Doğrulanmış kurum oluşturur.
+
+### POST /v1/admin/organizations/:id/memberships
+
+Yalnız global `admin`. Var olan kullanıcıyı kuruma `official` veya `org_admin` rolüyle ekler.
+
+### PUT /v1/admin/issues/:id/assignment
+
+Yalnız global `admin`. Sorunu doğrulanmış kuruma atar veya atamayı değiştirir.
+
+### GET /v1/issues/:id/authority
+
+Public kurum bilgisini döndürür. Oturum açmış kullanıcı kurumun aktif üyesiyse `canUpdateStatus=true` döner. Atama yoksa `organization=null`.
+
+### PATCH /v1/issues/:id/status
+
+Yalnız atanmış doğrulanmış kurumun aktif üyesi veya global admin.
+
+İzinli geçişler:
+- `Yeni / Doğrulandı / Uzun süredir açık → İşlemde`
+- `İşlemde → Çözüldü`
+- `Çözüldü → İşlemde` (yeniden açma)
+
+Doğrudan `Yeni → Çözüldü` geçişi reddedilir. Her resmi değişiklik `status_history` içine `actor_type=official`, kurum kimliği ve açıklama notuyla yazılır; public timeline ham kullanıcı/istemci kimliğini yayınlamaz ve kurum adını gösterir.
