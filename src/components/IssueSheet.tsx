@@ -19,6 +19,8 @@ interface IssueSheetProps {
     issueId: string,
     feedback: ResolutionFeedbackValue,
   ) => Promise<void>;
+  onReportIssue: (issue: Issue) => void;
+  onReportComment: (commentId: string, label: string) => void;
 }
 
 function stageFor(issue: Issue): number {
@@ -39,6 +41,8 @@ export function IssueSheet({
   communityLoading,
   onAddComment,
   onResolutionFeedback,
+  onReportIssue,
+  onReportComment,
 }: IssueSheetProps) {
   if (!issue) return null;
 
@@ -95,6 +99,13 @@ export function IssueSheet({
             {issue.status === 'Çözüldü' ? 'Sorun çözüldü' : confirmed ? 'Doğruladın ✓' : 'Ben de gördüm'}
           </button>
         </div>
+        <button
+          type="button"
+          className="issue-report-link"
+          onClick={() => onReportIssue(issue)}
+        >
+          Bu kaydı bildir
+        </button>
 
         <IssueCommunity
           issue={issue}
@@ -102,6 +113,7 @@ export function IssueSheet({
           loading={communityLoading}
           onAddComment={onAddComment}
           onResolutionFeedback={onResolutionFeedback}
+          onReportComment={onReportComment}
         />
       </div>
     </section>
