@@ -1236,7 +1236,7 @@ async function handleReviewModerationReport(req, res, origin, reportId) {
 
       if (tableName) {
         const ownerResult = await client.query(
-          tableName === 'issue'
+          tableName === 'issues'
             ? `select created_by_actor as actor_id, id as issue_id
                from issues where id = $1`
             : `select client_id as actor_id, issue_id
