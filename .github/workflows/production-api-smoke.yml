@@ -50,3 +50,21 @@ jobs:
           curl --fail --silent --show-error             -X OPTIONS -D "$headers" -o /dev/null             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Access-Control-Request-Method: POST'             -H 'Access-Control-Request-Headers: content-type,x-sokak-client-id'             https://sokak-api-production.up.railway.app/v1/uploads/photo
           grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
           grep -qi '^access-control-allow-methods: .*POST' "$headers"
+
+      - name: Auth endpoint requires a session
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          status="$(curl --silent --show-error             -D "$headers" -o "$body" -w '%{http_code}'             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'X-Sokak-Client-Id: production-auth-smoke'             https://sokak-api-production.up.railway.app/v1/auth/me)"
+          test "$status" = "401"
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          grep -q 'Oturum açman gerekiyor' "$body"
+
+      - name: Auth preflight
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          curl --fail --silent --show-error             -X OPTIONS -D "$headers" -o /dev/null             -H 'Origin: https://mehmetyildiz03.github.io'             -H 'Access-Control-Request-Method: GET'             -H 'Access-Control-Request-Headers: authorization,x-sokak-client-id'             https://sokak-api-production.up.railway.app/v1/auth/me
+          grep -qi '^access-control-allow-origin: https://mehmetyildiz03.github.io' "$headers"
+          grep -qi '^access-control-allow-headers: .*Authorization' "$headers"
