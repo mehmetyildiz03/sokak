@@ -54,3 +54,19 @@ export interface IssueCommunitySnapshot {
   comments: IssueComment[];
   resolution: ResolutionFeedbackSummary;
 }
+
+export interface UserProfileStats {
+  reports: number;
+  confirmations: number;
+  comments: number;
+  follows: number;
+}
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  displayName: string;
+  role: 'citizen' | 'moderator' | 'official' | 'admin';
+  createdAt: string;
+  stats: UserProfileStats;
+}
