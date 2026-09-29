@@ -155,6 +155,8 @@ export function MapView({
         clusterProperties: {
           followedCount: ['+', ['get', 'followed']],
           longOpenCount: ['+', ['case', ['==', ['get', 'status'], 'Uzun süredir açık'], 1, 0]],
+          recentReportCount: ['+', ['get', 'recentReport']],
+          recentCommentCount: ['+', ['get', 'recentComment']],
         },
       });
 
@@ -197,8 +199,20 @@ export function MapView({
             '#145c68',
           ],
           'circle-opacity': 0.92,
-          'circle-stroke-width': ['case', ['>', ['get', 'followedCount'], 0], 4, 3],
-          'circle-stroke-color': ['case', ['>', ['get', 'followedCount'], 0], '#f6c85f', '#ffffff'],
+          'circle-stroke-width': [
+            'case',
+            ['>', ['get', 'recentCommentCount'], 0], 5,
+            ['>', ['get', 'recentReportCount'], 0], 5,
+            ['>', ['get', 'followedCount'], 0], 4,
+            3,
+          ],
+          'circle-stroke-color': [
+            'case',
+            ['>', ['get', 'recentCommentCount'], 0], '#f0a728',
+            ['>', ['get', 'recentReportCount'], 0], '#3bb9b6',
+            ['>', ['get', 'followedCount'], 0], '#f6c85f',
+            '#ffffff',
+          ],
         },
       });
 
