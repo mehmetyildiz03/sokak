@@ -966,6 +966,7 @@ export default function App() {
             <span><i className="dot dot-new" /> Yeni</span>
             <span><i className="dot dot-confirmed" /> Doğrulandı</span>
             <span><i className="dot dot-old" /> Uzun süredir açık</span>
+            <span><i className="legend-recent-ring" /> Yeni eklenen</span>
             <span><i className="legend-comment-badge">2</i> Yorum</span>
           </aside>
         ) : (
