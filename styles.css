@@ -2781,3 +2781,12 @@ button:disabled { cursor: default; }
   line-height: 1;
   box-shadow: 0 1px 4px rgba(15,79,89,.2);
 }
+
+.legend-recent-ring {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #3bb9b6;
+  border-radius: 50%;
+  background: transparent;
+  box-sizing: border-box;
+}
